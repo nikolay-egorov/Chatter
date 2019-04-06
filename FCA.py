@@ -11,9 +11,6 @@ class FCA:
     """
 
     def __init__(self,data,obj,attr):
-        # self.I = np.array(data)
-        # self.G = np.array(obj)
-        # self.M = np.array(attr)
         self.I = data
         self.G = obj
         self.M = attr
@@ -26,58 +23,25 @@ class FCA:
 
     def getBipartiteGroups(self):
         cList = []
-        aLen = len(self.I)
-        bLen = len(self.I[0])
-        # printMat(aMat)
-        # print(aLen,bLen," are aLen and bLen\n\n")
-        for x in range(0,aLen):
-            tmpList = []
+        objLen = len(self.I)
+        attrLen = len(self.I[0])
+
+        for x in range(0,objLen):
             tmpObj = [self.G[x]]
-
-            for y in range(0,bLen):
-                if self.I[x][y] == '1':
-                    tmpList.append(self.M[y])
-
+            tmpList = [self.M[y] for y in range(0,attrLen) if self.I[x][y] == '1']
             tmp = tmpObj,tmpList
             self.dictionaryGM[self.G[x]] = tmpList
             cList.append(tmp)
 
-        for x in range(0,bLen):
-            tmpList = []
-            tmpattr = [self.M[x]]
-
-            for y in range(0,aLen):
-                if self.I[y][x] == '1':
-                    tmpList.append(self.G[y])
-
-            tmp = tmpList,tmpattr
+        for x in range(0,attrLen):
+            tmpAttr = [self.M[x]]
+            tmpList = [self.G[y] for y in range(0,objLen) if self.I[y][x] == '1']
+            tmp = tmpList,tmpAttr
             self.dictionaryGM[self.M[x]] = tmpList
             cList.append(tmp)
+
         self.bipartiteGroups = cList
         return self.bipartiteGroups
-
-    def removeUnclosed(self):
-        flist = []
-        for x in range(0,len(self.bipartiteGroups)):
-            list_top = []
-            list_bottom = []
-            for y in range(0,len(self.bipartiteGroups[x][0])):
-                if list_top == []:
-                    list_top = self.dictionaryGM[self.bipartiteGroups[x][0][y]]
-                else:
-                    list_top = list(set(list_top).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][0][y]])))
-
-            for z in range(0,len(self.bipartiteGroups[x][1])):
-                if not list_bottom:
-                    list_bottom = self.dictionaryGM[self.bipartiteGroups[x][1][z]]
-                else:
-                    list_bottom = list(
-                        set(list_bottom).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][1][z]])))
-            #       print ("printing both list for ",  x,  list_top,  list_bottom)
-            if set(list_top) == set(self.bipartiteGroups[x][1]) and set(list_bottom) == set(self.bipartiteGroups[x][0]):
-                flist.append(self.bipartiteGroups[x])
-        self.bipartiteGroups = flist
-        return flist
 
     def condenseList(self):
         clist = []
@@ -131,6 +95,7 @@ class FCA:
         self.bipartiteGroups = flist
         return self.bipartiteGroups
 
+    # Need improvements
     def buildLatticeGraph(self):
 
         hasSuccessor = []
@@ -177,7 +142,7 @@ class FCA:
         lastNode = "".join(str(m) for m in self.G) + ", " + "".join(str(m) for m in list_bottom)
         self.graph.add_node(lastNode)
 
-        # adding edges to themself.M[x]
+        # adding edges to them self.M[x]
         for x in range(0,len(self.bipartiteGroups)):
             if x not in hasSuccessor:
                 nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
@@ -203,16 +168,13 @@ class FCA:
 
     def buildLattice(self):
         self.getBipartiteGroups()
-        bCListSize = len(self.bipartiteGroups)
-        bCListSizeCondensed = -1
+        bigroupsListSize = len(self.bipartiteGroups)
+        bigroupsListSizeCondensed = -1
         # Condense bipartite cliques until no change
-        while bCListSize != bCListSizeCondensed:
-            bCListSize = len(self.bipartiteGroups)
+        while bigroupsListSize != bigroupsListSizeCondensed:
+            bigroupsListSize = len(self.bipartiteGroups)
             self.bipartiteGroups = self.condenseList()
-            bCListSizeCondensed = len(self.bipartiteGroups)
-
-        # filter concepts
-        self.removeUnclosed()
+            bigroupsListSizeCondensed = len(self.bipartiteGroups)
 
         for x in range(0,len(self.bipartiteGroups)):
             object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
