@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 
 class Node:
     def __init__(self, objects, attributes, **kwargs):
+        self.active = True
         self.attributes = []
         if (attributes is not None):
             self.attributes.extend(attributes)
@@ -22,6 +23,9 @@ class Node:
             self.isAttributeEntry = True
         else:
             self.isAttributeEntry = False
+
+    def deactivate(self):
+        self.active = False
 
     def __eq__(self, other):
         if (isinstance(other, Node)):
@@ -49,6 +53,10 @@ class Node:
     def connectWithChild(self, child):
         child.parents.append(self)
         self.children.append(child)
+
+    def connectWithParent(self, parent):
+        self.parents.append(parent)
+        parent.children.append(self)
 
     def disconnectWithChild(self, child):
         child.parents.remove(self)
@@ -139,30 +147,24 @@ class FCA:
     def optimizeIncoherentToHierarchial(self):
         for parent in self.graph:
             for child in self.graph:
-                if set(parent.attributes).issubset(child.attributes):
+                if parent is not child and set(parent.attributes).issubset(child.attributes):
                     if child not in parent.children:
                         child.connectWithParent(parent)
-                        parent.clearFastLinks()
-                        child.clearFastLinks()
+                        # parent.clearFastLinks()
+                        # child.clearFastLinks()
 
-    def clearSingleLinks(self):
-        while True:
-            for node in self.graph:
-                if not node.isConcept and len(node.parents) == 1 and len(node.children) == 1:
-                    child = node.children[0]
-                    parent = node.parents[0]
-                    if node.isAttributeEntry:
-                        child.isAttributeEntry = True
-                    for parent in node.parents:
-                        parent.children.remove(node)
-                    for child in node.children:
-                        child.parents.remove(node)
-                    self.graph.remove(node)
-                    if not child.dfs(parent):
-                        child.connectWithParent(parent)
-                    break
-            else:
-                break
+    def clearSingleChildLinks(self):
+        for node in self.graph:
+            if not node.isConcept and len(node.children) == 1 and node.children[0] != self.endNode:
+                child = node.children[0]
+                if node.isAttributeEntry:
+                    child.isAttributeEntry = True
+                for parent in node.parents:
+                    parent.children.remove(node)
+                child.parents.remove(node)
+                for parent in node.parents:
+                    parent.connectWithChild(child)
+                node.deactivate()
 
     def buildLattice(self):
         self.addConceptNodes()
@@ -171,8 +173,10 @@ class FCA:
         self.clearTransitivePaths()
         self.optimizeMultipleToHierarchial()
         self.clearTransitivePaths()
+        self.optimizeIncoherentToHierarchial()
+        self.clearTransitivePaths()
         print("hello")
-        # self.clearSingleLinks()
+        self.clearSingleChildLinks()
         # self.optimizeIncoherentToHierarchial()
         print("hello")
 
