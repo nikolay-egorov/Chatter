@@ -18,7 +18,7 @@ while True:
     message = input('Ты: ')
     if message.strip() != 'Пока':
         reply = chatbot.get_response(message)
-        print('Бот:' , reply)
+        print('Бот:', reply)
     if message.strip() == 'Пока':
         print('Бот : Пока')
         break

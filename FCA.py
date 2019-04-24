@@ -4,89 +4,186 @@ from matplotlib import pyplot as plt
 
 
 class Node:
-    def __init__(self, attributes, objects = None):
-        self.attributes = attributes
-        self.objects = objects
+    def __init__(self, objects, attributes, **kwargs):
+        self.attributes = []
+        if (attributes is not None):
+            self.attributes.extend(attributes)
+        self.objects = []
+        if (objects is not None):
+            self.objects.extend(objects)
+        self.children = []
+        self.parents = []
+        if ("isConcept" in kwargs.keys() and kwargs["isConcept"] == True):
+            self.isConcept = True
+        else:
+            self.isConcept = False
+
+        if ("isAttributeEntry" in kwargs.keys() and kwargs["isAttributeEntry"] == True):
+            self.isAttributeEntry = True
+        else:
+            self.isAttributeEntry = False
+
     def __eq__(self, other):
         if (isinstance(other, Node)):
-            return self.attributes == other.attributes
+            return sorted(self.attributes) == sorted(other.attributes) and sorted(self.objects) == sorted(other.objects)
+
+    # def __hash__(self):
+    #     return hash(tuple(sorted(self.attributes)))
+
+    def clearFastLinks(self):
+        for parent in self.parents:
+            for child in self.children:
+                if child in parent.children:
+                    parent.children.remove(child)
+                if parent in child.parents:
+                    child.parents.remove(parent)
+
+    def dfs(self, final):
+        if self is final:
+            return True
+        for node in self.parents:
+            if node.dfs(final):
+                return True
+        return False
+
+    def connectWithChild(self, child):
+        child.parents.append(self)
+        self.children.append(child)
+
+    def disconnectWithChild(self, child):
+        child.parents.remove(self)
+        self.children.remove(child)
 
 
 class FCA:
     def __init__(self, data, objects, attributes):
-        self.data = data
+        self.data = np.array(data)
         self.objects = objects
         self.attributes = attributes
-        self.lattice = []
-        self.adj = {}
-        self.dictionaryGM = {}
-        self.bipartiteGroups = []
-        self.graphnx = nx.Graph()
-        self.conceptDict = {}
-        self.startNode = Node(None, None)
-        self.graph = [self.startNode]
+        self.startNode = Node(objects, None)
+        self.endNode = Node(None, attributes)
+        self.graph = [self.startNode, self.endNode]
+        # self.lattice = []
+        # self.adj = {}
+        # self.dictionaryGM = {}
+        # self.bipartiteGroups = []
+        # self.graphnx = nx.Graph()
+        # self.conceptDict = {}
+
+    def removeNode(self, node):
+        for parent in node.parents:
+            parent.children.remove(node)
+        for child in node.children:
+            child.parents.remove(node)
+        self.graph.remove(node)
 
     def addConceptNodes(self):
         objectsLen = len(self.objects)
         attributesLen = len(self.attributes)
-
         for i in range(0, objectsLen):
-            tempObjects = [self.objects[j] for j in range(0, objectsLen) if self.data[j] == self.data[i]]
+            tempObjects = [self.objects[k] for k in range(0, objectsLen) if
+                           np.array_equal(self.data[k, :], self.data[i, :])]
             tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] == '1']
-            node = Node(tempObjects, tempAttributes)
+            node = Node(tempObjects, tempAttributes, isConcept=True)
             if (node not in self.graph):
-               self.graph.append(node)
-
-        for j in range(0, attributesLen):
-            tmpAttr = [self.attributes[j]]
-            tempAttributes = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] == '1']
-            temp = tempAttributes, tmpAttr
-            self.bipartiteGroups.append(temp)
+                self.graph.append(node)
 
     def addAttributeNodes(self):
-        lastSize = len(self.bipartiteGroups)
+        objectsLen = len(self.objects)
+        attributesLen = len(self.attributes)
+        for j in range(0, attributesLen):
+            tempObjects = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] == '1']
+            tempAttributes = [self.attributes[k] for k in range(0, attributesLen) if
+                              np.array_equal(self.data[:, k], self.data[:, j])]
+            node = Node(tempObjects, tempAttributes, isAttributeEntry=True)
+            if (node not in self.graph):
+                self.graph.append(node)
+
+    def connectNodes(self):
+        for child in self.graph:
+            for parent in self.graph:
+                if child is not parent and set(child.objects).issubset(set(parent.objects)) and \
+                        set(parent.attributes).issubset(set(child.attributes)):
+                    parent.connectWithChild(child)
+
+    def clearTransitivePaths(self):
+        for node in self.graph:
+            node.clearFastLinks()
+
+    def getChildrenAttributeIntersection(self, node):
+        attributesUnion = set()
+        if node == self.startNode or node == self.endNode:
+            return attributesUnion
+        flag = False
+        for child in node.children:
+            if (child != self.endNode):
+                if not flag and child != self.endNode:
+                    attributesUnion = set(child.attributes)
+                    flag = True
+                elif child != self.endNode:
+                    attributesUnion &= set(child.attributes)
+        attributesUnion -= set(node.attributes)
+        return attributesUnion
+
+    def optimizeMultipleToHierarchial(self):
+        for node in self.graph:
+            attributeIntersection = self.getChildrenAttributeIntersection(node)
+            if attributeIntersection:
+                for parent in self.graph:
+                    if parent is not node:
+                        if parent is not self.startNode and parent is not self.endNode and \
+                                set(parent.attributes).issubset(attributeIntersection):
+                            node.attributes.extend(list(parent.attributes))
+                            parent.connectWithChild(node)
+
+    def optimizeIncoherentToHierarchial(self):
+        for parent in self.graph:
+            for child in self.graph:
+                if set(parent.attributes).issubset(child.attributes):
+                    if child not in parent.children:
+                        child.connectWithParent(parent)
+                        parent.clearFastLinks()
+                        child.clearFastLinks()
+
+    def clearSingleLinks(self):
         while True:
-            newBipartiteGroups = []
-            objectsLen = len(self.objects)
-            attributesLen = len(self.attributes)
-
-            for i in range(0, len(self.bipartiteGroups)):
-                g1 = self.bipartiteGroups[i]
-                tempObjects = set(g1[0])
-                tempAttributes = set(g1[1])
-                for j in range(0, attributesLen):
-                    g2 = self.bipartiteGroups[j]
-                    if tempAttributes == set(g2[1]):
-                        tempObjects = tempObjects.union(set(g2[0]))
-                tempGroup = list(tempObjects), list(tempAttributes)
-                if (not (tempGroup in newBipartiteGroups)):
-                    newBipartiteGroups.append(tempGroup)
-
-            self.bipartiteGroups = newBipartiteGroups
-            if lastSize == len(self.bipartiteGroups):
-                break
+            for node in self.graph:
+                if not node.isConcept and len(node.parents) == 1 and len(node.children) == 1:
+                    child = node.children[0]
+                    parent = node.parents[0]
+                    if node.isAttributeEntry:
+                        child.isAttributeEntry = True
+                    for parent in node.parents:
+                        parent.children.remove(node)
+                    for child in node.children:
+                        child.parents.remove(node)
+                    self.graph.remove(node)
+                    if not child.dfs(parent):
+                        child.connectWithParent(parent)
+                    break
             else:
-                lastSize = len(self.bipartiteGroups)
-
-    # def buildGraph(self):
-
-
+                break
 
     def buildLattice(self):
         self.addConceptNodes()
         self.addAttributeNodes()
-        self.buildGraph()
+        self.connectNodes()
+        self.clearTransitivePaths()
+        self.optimizeMultipleToHierarchial()
+        self.clearTransitivePaths()
+        print("hello")
+        # self.clearSingleLinks()
+        # self.optimizeIncoherentToHierarchial()
+        print("hello")
 
-
-        for x in range(0, len(self.bipartiteGroups)):
-            object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
-            attribute = "".join(str(m) for m in sorted(self.bipartiteGroups[x][1]))
-            self.conceptDict[object] = set(self.bipartiteGroups[x][1])
-            self.conceptDict[attribute] = set(self.bipartiteGroups[x][0])
-
-        self.bipartiteGroups.sort(key=lambda a: len(a[0]))
-        return self.conceptDict
-
+        # for x in range(0, len(self.bipartiteGroups)):
+        #     object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
+        #     attribute = "".join(str(m) for m in sorted(self.bipartiteGroups[x][1]))
+        #     self.conceptDict[object] = set(self.bipartiteGroups[x][1])
+        #     self.conceptDict[attribute] = set(self.bipartiteGroups[x][0])
+        #
+        # self.bipartiteGroups.sort(key=lambda a: len(a[0]))
+        # return self.conceptDict
 
     def removeUnclosed(self):
         flist = []
@@ -193,7 +290,8 @@ class FCA:
         plt.savefig(path)
 
     def saveLattice(self, path):
-        np.savez(path, I=self.data, M=self.attributes, G=self.objects, dictionaryGM=self.dictionaryGM, conceptDict=self.conceptDict,
+        np.savez(path, I=self.data, M=self.attributes, G=self.objects, dictionaryGM=self.dictionaryGM,
+                 conceptDict=self.conceptDict,
                  bipartiteGroups=self.bipartiteGroups)
 
     def loadLattice(self, path):
