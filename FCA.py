@@ -27,12 +27,10 @@ class Node:
     def deactivate(self):
         self.active = False
 
+    #isn't used
     def __eq__(self, other):
         if (isinstance(other, Node)):
             return sorted(self.attributes) == sorted(other.attributes) and sorted(self.objects) == sorted(other.objects)
-
-    # def __hash__(self):
-    #     return hash(tuple(sorted(self.attributes)))
 
     def clearFastLinks(self):
         for parent in self.parents:
@@ -42,6 +40,7 @@ class Node:
                 if parent in child.parents:
                     child.parents.remove(parent)
 
+    # isn't used
     def dfs(self, final):
         if self is final:
             return True
@@ -54,10 +53,12 @@ class Node:
         child.parents.append(self)
         self.children.append(child)
 
+    # isn't used
     def connectWithParent(self, parent):
         self.parents.append(parent)
         parent.children.append(self)
 
+    # isn't used
     def disconnectWithChild(self, child):
         child.parents.remove(self)
         self.children.remove(child)
@@ -77,13 +78,6 @@ class FCA:
         # self.bipartiteGroups = []
         # self.graphnx = nx.Graph()
         # self.conceptDict = {}
-
-    def removeNode(self, node):
-        for parent in node.parents:
-            parent.children.remove(node)
-        for child in node.children:
-            child.parents.remove(node)
-        self.graph.remove(node)
 
     def addConceptNodes(self):
         objectsLen = len(self.objects)
@@ -133,7 +127,7 @@ class FCA:
         attributesUnion -= set(node.attributes)
         return attributesUnion
 
-    def optimizeMultipleToHierarchial(self):
+    def optimizeAttributeNodes(self):
         for node in self.graph:
             attributeIntersection = self.getChildrenAttributeIntersection(node)
             if attributeIntersection:
@@ -144,7 +138,7 @@ class FCA:
                             node.attributes.extend(list(parent.attributes))
                             parent.connectWithChild(node)
 
-    def optimizeIncoherentToHierarchial(self):
+    def optimizeConceptNodes(self):
         for parent in self.graph:
             for child in self.graph:
                 if parent is not child and set(parent.attributes).issubset(child.attributes):
@@ -171,14 +165,11 @@ class FCA:
         self.addAttributeNodes()
         self.connectNodes()
         self.clearTransitivePaths()
-        self.optimizeMultipleToHierarchial()
+        self.optimizeAttributeNodes()
         self.clearTransitivePaths()
-        self.optimizeIncoherentToHierarchial()
+        self.optimizeConceptNodes()
         self.clearTransitivePaths()
-        print("hello")
         self.clearSingleChildLinks()
-        # self.optimizeIncoherentToHierarchial()
-        print("hello")
 
         # for x in range(0, len(self.bipartiteGroups)):
         #     object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
