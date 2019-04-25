@@ -4,7 +4,8 @@ from matplotlib import pyplot as plt
 
 
 class Node:
-    def __init__(self, objects, attributes, **kwargs):
+    def __init__(self, objects, attributes, num, **kwargs):
+        self.num = num
         self.active = True
         self.attributes = []
         if (attributes is not None):
@@ -24,29 +25,48 @@ class Node:
         else:
             self.isAttributeEntry = False
 
+    # def __str__(self):
+    #     return "(#" + str(self.num) + " parents:[" + ", ".join(
+    #         str(parent.num) for parent in self.parents) + "] children:[" + ", ".join(
+    #         str(child.num) for child in self.children) + "]" + " attr:" + str(self.attributes) + ")"
+
+    def __str__(self):
+        return "(#" + str(self.num) + " parents:[" + ", ".join(
+            str(parent.num) for parent in self.parents) + "] children:[" + ", ".join(
+            str(child.num) for child in self.children) + "]" + ")"
+
     def deactivate(self):
         self.active = False
 
-    #isn't used
+    def isNotEndStart(self):
+        return self.active and self.children and self.parents
+
+    # isn't used
     def __eq__(self, other):
         if (isinstance(other, Node)):
-            return sorted(self.attributes) == sorted(other.attributes) and sorted(self.objects) == sorted(other.objects)
+            return self.num == other.num
+            # return sorted(self.attributes) == sorted(other.attributes) and sorted(self.objects) == sorted(other.objects)
 
     def clearFastLinks(self):
         for parent in self.parents:
             for child in self.children:
-                if child in parent.children:
-                    parent.children.remove(child)
-                if parent in child.parents:
-                    child.parents.remove(parent)
+                if child.active and parent.active:
+                    if child in parent.children:
+                        parent.children.remove(child)
+                    if parent in child.parents:
+                        child.parents.remove(parent)
 
     # isn't used
-    def dfs(self, final):
+    def dfs(self, final, collection=set()):
         if self is final:
             return True
+        collection.add(self.num)
         for node in self.parents:
-            if node.dfs(final):
+            if str(node.num) in collection:
+                raise Exception("cicle in " + str(node.num))
+            if node.dfs(final, collection):
                 return True
+        collection.remove(self.num)
         return False
 
     def connectWithChild(self, child):
@@ -58,19 +78,16 @@ class Node:
         self.parents.append(parent)
         parent.children.append(self)
 
-    # isn't used
-    def disconnectWithChild(self, child):
-        child.parents.remove(self)
-        self.children.remove(child)
-
 
 class FCA:
     def __init__(self, data, objects, attributes):
+        self.flag1 = False
+        self.num = 2
         self.data = np.array(data)
         self.objects = objects
         self.attributes = attributes
-        self.startNode = Node(objects, None)
-        self.endNode = Node(None, attributes)
+        self.startNode = Node(objects, None, 0)
+        self.endNode = Node(None, attributes, 1)
         self.graph = [self.startNode, self.endNode]
         # self.lattice = []
         # self.adj = {}
@@ -79,6 +96,41 @@ class FCA:
         # self.graphnx = nx.Graph()
         # self.conceptDict = {}
 
+    def __str__(self):
+        return "\n".join(self.graph)
+
+    def validate(self, line=""):
+        print(line + "-----------validate started")
+        for node in self.graph:
+            if node.active:
+                print(node)
+
+        print("-----------")
+        for node in self.graph:
+            if node.active:
+                for parent in node.parents:
+                    if parent is node:
+                        print("loop at " + str(node))
+                    elif node not in parent.children:
+                        print(str(node) + " " + str(parent) + " aren't connected")
+                for child in node.children:
+                    if child is node:
+                        print("loop at " + str(node))
+                    elif node not in child.parents:
+                        print(str(node) + " " + str(child) + " aren't connected")
+                try:
+                    if not node.dfs(self.startNode):
+                        print(str(node) + " isn't connected with startNode")
+                except Exception as e:
+                    print(repr(e))
+
+                try:
+                    if not self.endNode.dfs(node):
+                        print(str(node) + " isn't connected with endNode")
+                except Exception as e:
+                    print(repr(e))
+        print("-----------validate is ended\n")
+
     def addConceptNodes(self):
         objectsLen = len(self.objects)
         attributesLen = len(self.attributes)
@@ -86,8 +138,12 @@ class FCA:
             tempObjects = [self.objects[k] for k in range(0, objectsLen) if
                            np.array_equal(self.data[k, :], self.data[i, :])]
             tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] == '1']
-            node = Node(tempObjects, tempAttributes, isConcept=True)
-            if (node not in self.graph):
+            node = Node(tempObjects, tempAttributes, self.num, isConcept=True)
+            for other in self.graph:
+                if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(other.objects):
+                    break
+            else:
+                self.num += 1
                 self.graph.append(node)
 
     def addAttributeNodes(self):
@@ -97,8 +153,12 @@ class FCA:
             tempObjects = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] == '1']
             tempAttributes = [self.attributes[k] for k in range(0, attributesLen) if
                               np.array_equal(self.data[:, k], self.data[:, j])]
-            node = Node(tempObjects, tempAttributes, isAttributeEntry=True)
-            if (node not in self.graph):
+            node = Node(tempObjects, tempAttributes, self.num, isAttributeEntry=True)
+            for other in self.graph:
+                if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(other.objects):
+                    break
+            else:
+                self.num += 1
                 self.graph.append(node)
 
     def connectNodes(self):
@@ -110,7 +170,10 @@ class FCA:
 
     def clearTransitivePaths(self):
         for node in self.graph:
-            node.clearFastLinks()
+            if node.isNotEndStart():
+                node.clearFastLinks()
+            if self.flag1:
+                self.validate("after clear " + str(node))
 
     def getChildrenAttributeIntersection(self, node):
         attributesUnion = set()
@@ -128,28 +191,37 @@ class FCA:
         return attributesUnion
 
     def optimizeAttributeNodes(self):
-        for node in self.graph:
-            attributeIntersection = self.getChildrenAttributeIntersection(node)
+        for child in self.graph:
+            attributeIntersection = self.getChildrenAttributeIntersection(child)
             if attributeIntersection:
                 for parent in self.graph:
-                    if parent is not node:
-                        if parent is not self.startNode and parent is not self.endNode and \
-                                set(parent.attributes).issubset(attributeIntersection):
-                            node.attributes.extend(list(parent.attributes))
-                            parent.connectWithChild(node)
+                    if parent is not child:
+                        if parent.isNotEndStart() and child.isNotEndStart():
+                            if set(parent.attributes).issubset(attributeIntersection):
+                                # print("parent: " + str(parent))
+                                # print("child: " + str(child))
+                                # print("-attrInter: " + str(attributeIntersection))
+
+                                child.attributes.extend(list(parent.attributes))
+                                # print("child: " + str(child))
+                                # print("-------")
+                                parent.connectWithChild(child)
 
     def optimizeConceptNodes(self):
         for parent in self.graph:
             for child in self.graph:
-                if parent is not child and set(parent.attributes).issubset(child.attributes):
-                    if child not in parent.children:
-                        child.connectWithParent(parent)
-                        # parent.clearFastLinks()
-                        # child.clearFastLinks()
+                if parent is not child:
+                    if parent.isNotEndStart() and child.isNotEndStart():
+                        if set(parent.attributes).issubset(set(child.attributes)):
+                            if child not in parent.children:
+                                parent.connectWithChild(child)
+                                parent.clearFastLinks()
+                                # child.clearFastLinks()
 
     def clearSingleChildLinks(self):
         for node in self.graph:
-            if not node.isConcept and len(node.children) == 1 and node.children[0] != self.endNode:
+            if node.isNotEndStart() and not node.isConcept and len(node.children) == 1 and node.children[
+                0] != self.endNode:
                 child = node.children[0]
                 if node.isAttributeEntry:
                     child.isAttributeEntry = True
@@ -165,12 +237,30 @@ class FCA:
         self.addAttributeNodes()
         self.connectNodes()
         self.clearTransitivePaths()
-        self.optimizeAttributeNodes()
-        self.clearTransitivePaths()
-        self.optimizeConceptNodes()
-        self.clearTransitivePaths()
-        self.clearSingleChildLinks()
+        # print("clearTransitivePath")
+        self.validate("after clearTransitive Paths 1")
 
+        self.optimizeAttributeNodes()
+        print("optimizeAttributes")
+        self.validate("after optimizeAttributes")
+        # self.flag1 = True
+
+        self.clearTransitivePaths()
+        self.validate("after clearTransitivePaths")
+
+        self.clearSingleChildLinks()
+        self.validate("after clearSingleChildLinks")
+
+        self.optimizeConceptNodes()
+        self.validate()
+
+        self.clearTransitivePaths()
+        self.validate()
+
+        self.clearSingleChildLinks()
+        self.validate()
+
+        print("we did it")
         # for x in range(0, len(self.bipartiteGroups)):
         #     object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
         #     attribute = "".join(str(m) for m in sorted(self.bipartiteGroups[x][1]))
