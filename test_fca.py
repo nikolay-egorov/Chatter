@@ -49,11 +49,13 @@ with open('test.csv', 'r') as fp:
     print("На что жалуетесь?")
     while True:
         info = fca.getInfo()
-        if info:
-            print("\nПоздравляем! У тебя " + ", ".join(info) + "! Можешь прогуливать универ! Вот тебе справка!")
         v = fca.getAttributes()
+        if info:
+            print("\nПоздравляем! У тебя " + ", ".join(info) + "! Можешь прогуливать универ! Вот тебе справка!\n")
+            if v:
+                print("Так-так, погоди. Задам тебе ещё пару вопросов.\n")
         if not v:
-            print("Больше мы тебе ничего не скажем!\n\nИли у тебя еще что-то болит?\n")
+            print("Больше мы тебе ничего не скажем!\n\nИли ты симулируешь? Признавайся, что на самом деле беспокоит?!\n")
             continue
         for i in range(0, len(v)):
             print(str(i + 1) + " " + ", ".join(v[i]))
@@ -65,6 +67,6 @@ with open('test.csv', 'r') as fp:
         else:
             if int(qIn) == len(v) + 1:
                 fca.refresh()
-                print("Или говори, чем болеешь, или иди учись!\n")
+                print("Или говори, чем болеешь, или справку не дам!\n")
                 continue
             fca.addAttributes(v[int(qIn) - 1])
