@@ -28,7 +28,7 @@ class Node:
     # def __str__(self):
     #     return "(#" + str(self.num) + " parents:[" + ", ".join(
     #         str(parent.num) for parent in self.parents) + "] children:[" + ", ".join(
-    #         str(child.num) for child in self.children) + "]" + " attr:" + str(self.attributes) + ")"
+    #         str(child.num) for child in self.children) + "]" + " attr:" + str(self.attributes) + " obj:" + str(self.objects) + ")"
 
     def __str__(self):
         return "(#" + str(self.num) + " parents:[" + ", ".join(
@@ -41,11 +41,9 @@ class Node:
     def isNotEndStart(self):
         return self.active and self.children and self.parents
 
-    # isn't used
     def __eq__(self, other):
         if (isinstance(other, Node)):
             return self.num == other.num
-            # return sorted(self.attributes) == sorted(other.attributes) and sorted(self.objects) == sorted(other.objects)
 
     def clearFastLinks(self):
         for parent in self.parents:
@@ -56,14 +54,13 @@ class Node:
                     if parent in child.parents:
                         child.parents.remove(parent)
 
-    # isn't used
     def dfs(self, final, collection=set()):
         if self is final:
             return True
         collection.add(self.num)
         for node in self.parents:
             if str(node.num) in collection:
-                raise Exception("cicle in " + str(node.num))
+                raise Exception("cicle in " + str(node))
             if node.dfs(final, collection):
                 return True
         collection.remove(self.num)
@@ -73,7 +70,6 @@ class Node:
         child.parents.append(self)
         self.children.append(child)
 
-    # isn't used
     def connectWithParent(self, parent):
         self.parents.append(parent)
         parent.children.append(self)
@@ -81,14 +77,16 @@ class Node:
 
 class FCA:
     def __init__(self, data, objects, attributes):
-        self.flag1 = False
-        self.num = 2
         self.data = np.array(data)
         self.objects = objects
         self.attributes = attributes
         self.startNode = Node(objects, None, 0)
         self.endNode = Node(None, attributes, 1)
+        self.num = 2
         self.graph = [self.startNode, self.endNode]
+
+        self.activeAttributes = set()
+        self.activeNode = self.startNode
         # self.lattice = []
         # self.adj = {}
         # self.dictionaryGM = {}
@@ -96,6 +94,45 @@ class FCA:
         # self.graphnx = nx.Graph()
         # self.conceptDict = {}
 
+    def refresh(self):
+        self.activeAttributes = set()
+        self.activeNode = self.startNode
+
+    def getAttributes(self):
+        if self.activeNode == self.endNode:
+            self.refresh()
+            return None
+        variants = []
+        for child in self.activeNode.children:
+            if (child == self.endNode):
+                self.refresh()
+                return None
+            variants.append(list(set(child.attributes) - self.activeAttributes))
+        return variants
+
+    def addAttributes(self, attributes):
+        self.activeAttributes |= set(attributes)
+        for child in self.activeNode.children:
+            if self.activeAttributes.issubset(set(child.attributes)):
+                self.activeNode = child
+                #????????
+                self.activeAttributes |= set(child.attributes)
+                return
+        minDiff = len(self.attributes) + 1
+        for node in self.graph:
+            nodeAttributes = set(node.attributes)
+            if self.activeAttributes.issubset(nodeAttributes) and len(nodeAttributes - self.activeAttributes) < minDiff:
+                minDiff = len(nodeAttributes - self.activeAttributes)
+                self.activeNode = node
+        if minDiff == len(self.attributes) + 1:
+            self.activeAttributes = self.endNode.attributes
+            self.activeNode = self.endNode
+
+    def getInfo(self):
+        if self.activeNode.isConcept:
+            return self.activeNode.objects
+        else:
+            return None
     def __str__(self):
         return "\n".join(self.graph)
 
@@ -172,23 +209,21 @@ class FCA:
         for node in self.graph:
             if node.isNotEndStart():
                 node.clearFastLinks()
-            if self.flag1:
-                self.validate("after clear " + str(node))
 
     def getChildrenAttributeIntersection(self, node):
-        attributesUnion = set()
+        attributesIntersection = set()
         if node == self.startNode or node == self.endNode:
-            return attributesUnion
+            return attributesIntersection
         flag = False
         for child in node.children:
             if (child != self.endNode):
                 if not flag and child != self.endNode:
-                    attributesUnion = set(child.attributes)
+                    attributesIntersection = set(child.attributes)
                     flag = True
                 elif child != self.endNode:
-                    attributesUnion &= set(child.attributes)
-        attributesUnion -= set(node.attributes)
-        return attributesUnion
+                    attributesIntersection &= set(child.attributes)
+        attributesIntersection -= set(node.attributes)
+        return attributesIntersection
 
     def optimizeAttributeNodes(self):
         for child in self.graph:
@@ -237,30 +272,28 @@ class FCA:
         self.addAttributeNodes()
         self.connectNodes()
         self.clearTransitivePaths()
-        # print("clearTransitivePath")
-        self.validate("after clearTransitive Paths 1")
+        # self.validate("after clearTransitive Paths 1")
 
         self.optimizeAttributeNodes()
-        print("optimizeAttributes")
-        self.validate("after optimizeAttributes")
-        # self.flag1 = True
+        # self.validate("after optimizeAttributes")
 
         self.clearTransitivePaths()
-        self.validate("after clearTransitivePaths")
+        # self.validate("after clearTransitivePaths")
 
         self.clearSingleChildLinks()
-        self.validate("after clearSingleChildLinks")
+        # self.validate("after clearSingleChildLinks")
 
         self.optimizeConceptNodes()
-        self.validate()
+        # self.validate()
 
         self.clearTransitivePaths()
-        self.validate()
+        # self.validate()
 
         self.clearSingleChildLinks()
-        self.validate()
+        # self.validate()
 
-        print("we did it")
+
+        print("Мы вас слушаем!\n")
         # for x in range(0, len(self.bipartiteGroups)):
         #     object = "".join(str(m) for m in sorted(self.bipartiteGroups[x][0]))
         #     attribute = "".join(str(m) for m in sorted(self.bipartiteGroups[x][1]))
@@ -270,121 +303,122 @@ class FCA:
         # self.bipartiteGroups.sort(key=lambda a: len(a[0]))
         # return self.conceptDict
 
-    def removeUnclosed(self):
-        flist = []
-        for x in range(0, len(self.bipartiteGroups)):
-            list_attr = []
-            list_obj = []
-            for y in range(0, len(self.bipartiteGroups[x][0])):
-                if list_attr == []:
-                    list_attr = self.dictionaryGM[self.bipartiteGroups[x][0][y]]
-                else:
-                    list_attr = list(set(list_attr).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][0][y]])))
-
-            for z in range(0, len(self.bipartiteGroups[x][1])):
-                if not list_obj:
-                    list_obj = self.dictionaryGM[self.bipartiteGroups[x][1][z]]
-                else:
-                    list_obj = list(
-                        set(list_obj).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][1][z]])))
-            # print ("printing both list for ",  x,  list_top,  list_bottom)
-            if set(list_attr) == set(self.bipartiteGroups[x][1]) and set(list_obj) == set(self.bipartiteGroups[x][0]):
-                flist.append(self.bipartiteGroups[x])
-        self.bipartiteGroups = flist
-        return self.bipartiteGroups
-
-    # Need improvements
-    def buildLatticeGraph(self):
-
-        hasSuccessor = []
-        hasPredecessor = []
-        for x in range(0, len(self.bipartiteGroups)):
-            nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
-                str(m) for m in self.bipartiteGroups[x][1])
-            self.graphnx.add_node(nodeName)
-
-        for x in range(0, len(self.bipartiteGroups)):
-            for y in range(x + 1, len(self.bipartiteGroups)):
-                if set(self.bipartiteGroups[x][0]).issubset(set(self.bipartiteGroups[y][0])):
-                    nodeName1 = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
-                        str(m) for m in self.bipartiteGroups[x][1])
-                    nodeName2 = "".join(str(m) for m in self.bipartiteGroups[y][0]) + ", " + "".join(
-                        str(m) for m in self.bipartiteGroups[y][1])
-                    self.graphnx.add_edge(nodeName1, nodeName2)
-                    hasSuccessor.append(x)
-                    hasPredecessor.append(y)
-
-        # Creating the top most and the bottom most node
-        list_top = []
-        list_bottom = []
-        for x in range(0, len(self.attributes)):
-            if not list_top:
-                list_top = self.dictionaryGM[self.attributes[x]]
-            else:
-                list_top = list(set(list_top).intersection(set(self.attributes[x])))
-
-        for x in range(0, len(self.objects)):
-            if not list_bottom:
-                list_bottom = self.dictionaryGM[self.objects[x]]
-            else:
-                list_bottom = list(set(list_bottom).intersection(set(self.objects[x])))
-        if not list_bottom:
-            list_bottom = ["null"]
-        if not list_top:
-            list_top = ["null"]
-
-        # adding them to the graph
-        firstNode = "".join(str(m) for m in list_top) + ", " + "".join(str(m) for m in self.attributes)
-        # print(firstNode)
-        self.graphnx.add_node(firstNode)
-        lastNode = "".join(str(m) for m in self.objects) + ", " + "".join(str(m) for m in list_bottom)
-        self.graphnx.add_node(lastNode)
-
-        # adding edges to them self.M[x]
-        for x in range(0, len(self.bipartiteGroups)):
-            if x not in hasSuccessor:
-                nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
-                    str(m) for m in self.bipartiteGroups[x][1])
-                # print(nodeName)
-                self.graphnx.add_edge(nodeName, lastNode)
-
-        for x in range(0, len(self.bipartiteGroups)):
-            if x not in hasPredecessor:
-                nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
-                    str(m) for m in self.bipartiteGroups[x][1])
-                self.graphnx.add_edge(nodeName, firstNode)
-        return self.graphnx
-
-    def queryLattice(self, query):
-        self.bipartiteGroups.sort(key=lambda x: len(x[0]))
-        key = "".join(str(m) for m in sorted(query.split()))
-        if key in self.conceptDict:
-            print(', '.join(self.conceptDict[key]), "\n")
-        else:
-            print("Not present in Concept lattice\n")
-        return 0
-
-    def saveLatticeGraph(self, path):
-        if not self.graphnx:
-            self.buildLatticeGraph()
-
-        nx.draw(self.graphnx, nx.kamada_kawai_layout(self.graphnx), with_labels=True,
-                node_color=range(self.graphnx.number_of_nodes()),
-                cmap=plt.cm.Blues)
-        plt.axis('off')
-        plt.savefig(path)
-
-    def saveLattice(self, path):
-        np.savez(path, I=self.data, M=self.attributes, G=self.objects, dictionaryGM=self.dictionaryGM,
-                 conceptDict=self.conceptDict,
-                 bipartiteGroups=self.bipartiteGroups)
-
-    def loadLattice(self, path):
-        data = np.load(path + ".npz")
-        self.data = data['I'].tolist()
-        self.objects = data['G'].tolist()
-        self.attributes = data['M'].tolist()
-        self.dictionaryGM = data['dictionaryGM'].tolist()
-        self.conceptDict = data['conceptDict'].tolist()
-        self.bipartiteGroups = data['bipartiteGroups'].tolist()
-        return self.conceptDict
+    #
+    # def removeUnclosed(self):
+    #     flist = []
+    #     for x in range(0, len(self.bipartiteGroups)):
+    #         list_attr = []
+    #         list_obj = []
+    #         for y in range(0, len(self.bipartiteGroups[x][0])):
+    #             if list_attr == []:
+    #                 list_attr = self.dictionaryGM[self.bipartiteGroups[x][0][y]]
+    #             else:
+    #                 list_attr = list(set(list_attr).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][0][y]])))
+    #
+    #         for z in range(0, len(self.bipartiteGroups[x][1])):
+    #             if not list_obj:
+    #                 list_obj = self.dictionaryGM[self.bipartiteGroups[x][1][z]]
+    #             else:
+    #                 list_obj = list(
+    #                     set(list_obj).intersection(set(self.dictionaryGM[self.bipartiteGroups[x][1][z]])))
+    #         # print ("printing both list for ",  x,  list_top,  list_bottom)
+    #         if set(list_attr) == set(self.bipartiteGroups[x][1]) and set(list_obj) == set(self.bipartiteGroups[x][0]):
+    #             flist.append(self.bipartiteGroups[x])
+    #     self.bipartiteGroups = flist
+    #     return self.bipartiteGroups
+    #
+    # # Need improvements
+    # def buildLatticeGraph(self):
+    #
+    #     hasSuccessor = []
+    #     hasPredecessor = []
+    #     for x in range(0, len(self.bipartiteGroups)):
+    #         nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
+    #             str(m) for m in self.bipartiteGroups[x][1])
+    #         self.graphnx.add_node(nodeName)
+    #
+    #     for x in range(0, len(self.bipartiteGroups)):
+    #         for y in range(x + 1, len(self.bipartiteGroups)):
+    #             if set(self.bipartiteGroups[x][0]).issubset(set(self.bipartiteGroups[y][0])):
+    #                 nodeName1 = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
+    #                     str(m) for m in self.bipartiteGroups[x][1])
+    #                 nodeName2 = "".join(str(m) for m in self.bipartiteGroups[y][0]) + ", " + "".join(
+    #                     str(m) for m in self.bipartiteGroups[y][1])
+    #                 self.graphnx.add_edge(nodeName1, nodeName2)
+    #                 hasSuccessor.append(x)
+    #                 hasPredecessor.append(y)
+    #
+    #     # Creating the top most and the bottom most node
+    #     list_top = []
+    #     list_bottom = []
+    #     for x in range(0, len(self.attributes)):
+    #         if not list_top:
+    #             list_top = self.dictionaryGM[self.attributes[x]]
+    #         else:
+    #             list_top = list(set(list_top).intersection(set(self.attributes[x])))
+    #
+    #     for x in range(0, len(self.objects)):
+    #         if not list_bottom:
+    #             list_bottom = self.dictionaryGM[self.objects[x]]
+    #         else:
+    #             list_bottom = list(set(list_bottom).intersection(set(self.objects[x])))
+    #     if not list_bottom:
+    #         list_bottom = ["null"]
+    #     if not list_top:
+    #         list_top = ["null"]
+    #
+    #     # adding them to the graph
+    #     firstNode = "".join(str(m) for m in list_top) + ", " + "".join(str(m) for m in self.attributes)
+    #     # print(firstNode)
+    #     self.graphnx.add_node(firstNode)
+    #     lastNode = "".join(str(m) for m in self.objects) + ", " + "".join(str(m) for m in list_bottom)
+    #     self.graphnx.add_node(lastNode)
+    #
+    #     # adding edges to them self.M[x]
+    #     for x in range(0, len(self.bipartiteGroups)):
+    #         if x not in hasSuccessor:
+    #             nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
+    #                 str(m) for m in self.bipartiteGroups[x][1])
+    #             # print(nodeName)
+    #             self.graphnx.add_edge(nodeName, lastNode)
+    #
+    #     for x in range(0, len(self.bipartiteGroups)):
+    #         if x not in hasPredecessor:
+    #             nodeName = "".join(str(m) for m in self.bipartiteGroups[x][0]) + ", " + "".join(
+    #                 str(m) for m in self.bipartiteGroups[x][1])
+    #             self.graphnx.add_edge(nodeName, firstNode)
+    #     return self.graphnx
+    #
+    # def queryLattice(self, query):
+    #     self.bipartiteGroups.sort(key=lambda x: len(x[0]))
+    #     key = "".join(str(m) for m in sorted(query.split()))
+    #     if key in self.conceptDict:
+    #         print(', '.join(self.conceptDict[key]), "\n")
+    #     else:
+    #         print("Not present in Concept lattice\n")
+    #     return 0
+    #
+    # def saveLatticeGraph(self, path):
+    #     if not self.graphnx:
+    #         self.buildLatticeGraph()
+    #
+    #     nx.draw(self.graphnx, nx.kamada_kawai_layout(self.graphnx), with_labels=True,
+    #             node_color=range(self.graphnx.number_of_nodes()),
+    #             cmap=plt.cm.Blues)
+    #     plt.axis('off')
+    #     plt.savefig(path)
+    #
+    # def saveLattice(self, path):
+    #     np.savez(path, I=self.data, M=self.attributes, G=self.objects, dictionaryGM=self.dictionaryGM,
+    #              conceptDict=self.conceptDict,
+    #              bipartiteGroups=self.bipartiteGroups)
+    #
+    # def loadLattice(self, path):
+    #     data = np.load(path + ".npz")
+    #     self.data = data['I'].tolist()
+    #     self.objects = data['G'].tolist()
+    #     self.attributes = data['M'].tolist()
+    #     self.dictionaryGM = data['dictionaryGM'].tolist()
+    #     self.conceptDict = data['conceptDict'].tolist()
+    #     self.bipartiteGroups = data['bipartiteGroups'].tolist()
+    #     return self.conceptDict
