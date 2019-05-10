@@ -77,13 +77,16 @@ class Node:
 
 
 class FCA:
-    def __init__(self, data, objects, attributes):
+    def __init__(self, data, objects, attributes, objectsChance):
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
                 if (data[i][j] == ""):
                     data[i][j] = "0"
         self.data = np.asfarray(np.array(data), float)
         self.objects = objects
+        self.objectsChance = np.asfarray(np.array(objectsChance), float)
+        for chance in self.objectsChance:
+            chance /= sum(self.objectsChance)
         self.attributes = attributes
         self.startNode = Node(objects, None, 0)
         self.endNode = Node(None, attributes, 1)
@@ -114,7 +117,7 @@ class FCA:
             loss = sumNotActiveRequired / sumRequired
             match = 1 if sumNotActiveRequired == 0 else sumActiveRequired / (sumActiveRequired + sumNotActiveRequired)
             surplus = sumActiveNotRequired / sumRequired
-            self.statistics[self.objects[i]] = (completeness, match, surplus, loss)
+            self.statistics[self.objects[i]] = (completeness, match, surplus, loss, self.objectsChance[i])
 
 
     def refresh(self):
@@ -144,9 +147,9 @@ class FCA:
                                     objectNum = list(self.objects).index(object)
                                     attributeNum = list(self.attributes).index(attribute)
                                     # probability of concept = match * frequency of illness
-                                    attributeProbability += self.statistics[object][1] * self.data[objectNum][attributeNum] * 1
+                                    attributeProbability += self.statistics[object][1] * self.data[objectNum][attributeNum] * self.objectsChance[objectNum]
                                     # importance of concept = completeness * match * frequency of illness
-                                    attributeImportance += self.statistics[object][0] * self.statistics[object][1]  * self.data[objectNum][attributeNum] * 1
+                                    attributeImportance += self.statistics[object][0] * self.statistics[object][1]  * self.data[objectNum][attributeNum] * self.objectsChance[objectNum]
                             if attribute in attributesImportance:
                                 attributesImportance[attribute] = max(attributeImportance, attributesImportance[attribute])
                             else:
