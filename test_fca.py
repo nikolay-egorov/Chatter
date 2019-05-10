@@ -1,9 +1,6 @@
 from FCA import FCA
 import csv
 import numpy as np
-"""
-That's just a working example of FCA class usage
-"""
 
 # obj = ['a','b','c','d','e','f','g']
 # print(len(obj))
@@ -42,31 +39,29 @@ with open('test.csv', 'r') as fp:
     fca.buildLattice()
 
 
-# fca.saveLattice('data/lattice')
-# fca.loadLattice('data/lattice')
-# fca.saveLatticeGraph('data/latticeFig.png')
+    # fca.saveLattice('data/lattice')
+    # fca.loadLattice('data/lattice')
+    # fca.saveLatticeGraph('data/latticeFig.png')
     print("Напишите одно число, которое соответствует Вашим симптомам\nQ - exit\n")
-    print("На что жалуетесь?")
+    print("Что беспокоит?")
     while True:
         info = fca.getInfo()
         v = fca.getAttributes()
-        if info:
-            print("\nПоздравляем! У тебя " + ", ".join(info) + "! Можешь прогуливать универ! Вот тебе справка!\n")
-            if v:
-                print("Так-так, погоди. Задам тебе ещё пару вопросов.\n")
-        if not v:
-            print("Больше мы тебе ничего не скажем!\n\nИли ты симулируешь? Признавайся, что на самом деле беспокоит?!\n")
-            continue
-        for i in range(0, len(v)):
-            print(str(i + 1) + " " + ", ".join(v[i]))
-        print(str(len(v) + 1) + " Ни на что! Просто дайте мне справку в универ!")
+        info = sorted(fca.getInfo(), key = lambda el: (el[1][1], el[1][0]))
+        for item in info:
+            print(item[0] + " - match: " + str(item[1][1]) + "; completeness: " + str(item[1][0]) + "; surplus: " + str(item[1][2]))
+        print("activeAttributes: " + fca.activeAttributes)
+        print("falseAttributes: " + fca.falseAttributes + "\n")
+
+        attribute = fca.getAttribute()
+        print("Волнует ли: " + attribute)
         qIn = input()
-        if qIn == "Q":
+        if qIn == "Q" or qIn == "q":
             print("Не болей!")
             exit(0)
+        elif qIn == "R" or qIn == "r":
+            fca.refresh()
+        elif qIn == "N" or qIn == "n":
+            fca.removeAttribute(attribute)
         else:
-            if int(qIn) == len(v) + 1:
-                fca.refresh()
-                print("Или говори, чем болеешь, или справку не дам!\n")
-                continue
-            fca.addAttributes(v[int(qIn) - 1])
+            fca.addAttributes(attribute)
