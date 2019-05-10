@@ -38,21 +38,17 @@ with open('test.csv', 'r') as fp:
     fca = FCA(aMat, obj, attr)
     fca.buildLattice()
 
-
-    # fca.saveLattice('data/lattice')
-    # fca.loadLattice('data/lattice')
-    # fca.saveLatticeGraph('data/latticeFig.png')
-    print("Напишите одно число, которое соответствует Вашим симптомам\nQ - exit\n")
-    print("Что беспокоит?")
     while True:
         info = fca.getInfo()
-        v = fca.getAttributes()
-        info = sorted(fca.getInfo(), key = lambda el: (el[1][1], el[1][0]))
+        info = sorted(fca.getInfo(), key = lambda el: (-el[1][1], -el[1][0], el[1][3], -el[1][2]))
         for item in info:
-            print(item[0] + " - match: " + str(item[1][1]) + "; completeness: " + str(item[1][0]) + "; surplus: " + str(item[1][2]))
-        print("activeAttributes: " + fca.activeAttributes)
-        print("falseAttributes: " + fca.falseAttributes + "\n")
-
+            print(item[0] + " - match: " + str(item[1][1]) + "; completeness: " + str(item[1][0]) + "; loss: " + str(item[1][3]) + "; surplus: " + str(item[1][2]))
+        print("activeAttributes: ")
+        for attr in fca.activeAttributes:
+            print(" " + attr)
+        print("falseAttributes: ")
+        for attr in fca.falseAttributes:
+            print(" " + attr)
         attribute = fca.getAttribute()
         print("Волнует ли: " + attribute)
         qIn = input()
@@ -64,4 +60,4 @@ with open('test.csv', 'r') as fp:
         elif qIn == "N" or qIn == "n":
             fca.removeAttribute(attribute)
         else:
-            fca.addAttributes(attribute)
+            fca.addAttribute(attribute)

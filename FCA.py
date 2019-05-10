@@ -78,7 +78,11 @@ class Node:
 
 class FCA:
     def __init__(self, data, objects, attributes):
-        self.data = np.array(data)
+        for i in range(0, len(data)):
+            for j in range(0, len(data[i])):
+                if (data[i][j] == ""):
+                    data[i][j] = "0"
+        self.data = np.asfarray(np.array(data), float)
         self.objects = objects
         self.attributes = attributes
         self.startNode = Node(objects, None, 0)
@@ -89,7 +93,7 @@ class FCA:
         self.activeAttributes = set()
         self.falseAttributes = set()
         self.activeNodes = [self.startNode]
-        self.statistics = dict(map(lambda object: (object, 0, 0, 0), objects))
+        self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0)), objects))
 
     def calculateStatistics(self):
         for i in range(0, len(self.objects)):
@@ -107,9 +111,10 @@ class FCA:
                 if self.data[i][j] > 0:
                     sumRequired += self.data[i][j]
             completeness = sumActiveRequired / sumRequired
-            match = 1 if sumNotActiveRequired == 0 else sumActiveRequired / sumNotActiveRequired
+            loss = sumNotActiveRequired / sumRequired
+            match = 1 if sumNotActiveRequired == 0 else sumActiveRequired / (sumActiveRequired + sumNotActiveRequired)
             surplus = sumActiveNotRequired / sumRequired
-            self.statistics[self.objects[i]] = (completeness, match, surplus)
+            self.statistics[self.objects[i]] = (completeness, match, surplus, loss)
 
 
     def refresh(self):
@@ -136,14 +141,20 @@ class FCA:
                             for child in self.graph:
                                 if child.isConcept and child.dfs(node, set()):
                                     object = child.objects[0]
-                                    objectNum = self.objects.index()
-                                    attributeNum = self.attributes.index(attribute)
+                                    objectNum = list(self.objects).index(object)
+                                    attributeNum = list(self.attributes).index(attribute)
                                     # probability of concept = match * frequency of illness
                                     attributeProbability += self.statistics[object][1] * self.data[objectNum][attributeNum] * 1
                                     # importance of concept = completeness * match * frequency of illness
                                     attributeImportance += self.statistics[object][0] * self.statistics[object][1]  * self.data[objectNum][attributeNum] * 1
-                        attributesImportance[attribute] = max(attributeImportance, attributesImportance[attribute])
-                        attributesProbability[attribute] = max(attributeProbability, attributesImportance[attribute])
+                            if attribute in attributesImportance:
+                                attributesImportance[attribute] = max(attributeImportance, attributesImportance[attribute])
+                            else:
+                                attributesImportance[attribute] = attributeImportance
+                            if attribute in attributesProbability:
+                                attributesProbability[attribute] = max(attributeProbability, attributesImportance[attribute])
+                            else:
+                                attributesProbability[attribute] = attributeProbability
 
         items = sorted(attributesProbability.items(), key = lambda item:(-item[1], item[0]))
 
@@ -157,21 +168,25 @@ class FCA:
         return mostImportanceAttribute
 
     def addAttribute(self, attribute):
-        self.activeAttributes.append(attribute)
+        self.activeAttributes.add(attribute)
+        newActiveNodes = []
         for activeNode in self.activeNodes:
             for child in activeNode.children:
                 if child is not self.endNode and attribute in child.attributes:
                     if child not in self.activeNodes:
-                        self.activeNodes.append(child)
+                        newActiveNodes.append(child)
+        self.activeNodes.extend(newActiveNodes)
         self.calculateStatistics()
 
     def removeAttribute(self, attribute):
-        self.falseAttributes(attribute)
+        self.falseAttributes.add(attribute)
+        newActiveNodes = []
         for activeNode in self.activeNodes:
             for child in activeNode.children:
                 if child is not self.endNode and attribute in child.attributes:
                     if len(set(child.attributes) - self.activeAttributes - self.falseAttributes) == 0:
-                        self.activeNodes.append(child)
+                        newActiveNodes.append(child)
+        self.activeNodes.extend(newActiveNodes)
         self.calculateStatistics()
 
     def getInfo(self):
@@ -245,7 +260,7 @@ class FCA:
         for i in range(0, objectsLen):
             tempObjects = [self.objects[k] for k in range(0, objectsLen) if
                            np.array_equal(self.data[k, :], self.data[i, :])]
-            tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] == '1']
+            tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] > 0]
             node = Node(tempObjects, tempAttributes, self.size, isConcept=True)
             for other in self.graph:
                 if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(
@@ -259,7 +274,7 @@ class FCA:
         objectsLen = len(self.objects)
         attributesLen = len(self.attributes)
         for j in range(0, attributesLen):
-            tempObjects = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] == '1']
+            tempObjects = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] > 0]
             tempAttributes = [self.attributes[k] for k in range(0, attributesLen) if
                               np.array_equal(self.data[:, k], self.data[:, j])]
             node = Node(tempObjects, tempAttributes, self.size, isAttributeEntry=True)
@@ -370,6 +385,8 @@ class FCA:
 
         self.clearTransitivePaths()
         self.validate("after clearTransitivePaths 999999999")
+
+        self.calculateStatistics()
 
         print("Мы вас слушаем!\n")
 
