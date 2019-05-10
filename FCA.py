@@ -83,6 +83,14 @@ class FCA:
                 if (data[i][j] == ""):
                     data[i][j] = "0"
         self.data = np.asfarray(np.array(data), float)
+        self.boolData = np.ones((len(data), len(data[0])))
+        for i in range(0, len(data)):
+            for j in range(0, len(data[i])):
+                if (data[i][j] == "0"):
+                    self.boolData[i][j] = False
+                else:
+                    self.boolData[i][j] = True
+
         self.objects = objects
         self.objectsChance = np.asfarray(np.array(objectsChance), float)
         for chance in self.objectsChance:
@@ -96,7 +104,7 @@ class FCA:
         self.activeAttributes = set()
         self.falseAttributes = set()
         self.activeNodes = [self.startNode]
-        self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0)), objects))
+        self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0, 0)), self.objects))
 
     def calculateStatistics(self):
         for i in range(0, len(self.objects)):
@@ -124,7 +132,7 @@ class FCA:
         self.activeAttributes = set()
         self.falseAttributes = set()
         self.activeNodes = [self.startNode]
-        self.statistics = dict(map(lambda object: (object, 0, 0, 0), self.objects))
+        self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0, 0)), self.objects))
         self.calculateStatistics()
 
     def getAttribute(self):
@@ -262,7 +270,7 @@ class FCA:
         attributesLen = len(self.attributes)
         for i in range(0, objectsLen):
             tempObjects = [self.objects[k] for k in range(0, objectsLen) if
-                           np.array_equal(self.data[k, :], self.data[i, :])]
+                           np.array_equal(self.boolData[k, :], self.boolData[i, :])]
             tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] > 0]
             node = Node(tempObjects, tempAttributes, self.size, isConcept=True)
             for other in self.graph:
@@ -279,7 +287,7 @@ class FCA:
         for j in range(0, attributesLen):
             tempObjects = [self.objects[i] for i in range(0, objectsLen) if self.data[i][j] > 0]
             tempAttributes = [self.attributes[k] for k in range(0, attributesLen) if
-                              np.array_equal(self.data[:, k], self.data[:, j])]
+                              np.array_equal(self.boolData[:, k], self.boolData[:, j])]
             node = Node(tempObjects, tempAttributes, self.size, isAttributeEntry=True)
             for other in self.graph:
                 if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(
