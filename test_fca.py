@@ -1,9 +1,7 @@
 from FCA import FCA
 import csv
 import numpy as np
-"""
-That's just a working example of FCA class usage
-"""
+#-*- coding: utf-8 -*-
 
 # obj = ['a','b','c','d','e','f','g']
 # print(len(obj))
@@ -18,13 +16,16 @@ That's just a working example of FCA class usage
 #     ['1','0','0','1','1', '1']
 # ]
 
+print("Укажите путь к файлу матрицы контекста:")
 
-with open('test.csv', 'r') as fp:
+# with open('test.csv', 'r') as fp:
+with open(input(), 'r') as fp:
     reader = csv.reader(fp, delimiter=',', quotechar='"', lineterminator='\n')
     data = np.array([row for row in reader])
-    attr = data[0, 1:]
+    attr = data[0, 2:]
     obj = data[1:, 0]
-    aMat = data[1:, 1:]
+    objChance = data[1:, 1]
+    aMat = data[1:, 2:]
     # obj = ['больница', 'югу', 'гостинка', 'ул мира', 'мира 100', 'светофор', 'калинина 26']
     # print(len(obj))
     # attr = ['здание', 'дорога', 'социальный', 'жилой', 'мгн', 'пандус', "больн"]
@@ -38,35 +39,29 @@ with open('test.csv', 'r') as fp:
     #     ['1', '0', '0', '1', '1', '1', '0']
     # ]
 
-    fca = FCA(aMat, obj, attr)
+    fca = FCA(aMat, obj, attr, objChance)
     fca.buildLattice()
 
-
-# fca.saveLattice('data/lattice')
-# fca.loadLattice('data/lattice')
-# fca.saveLatticeGraph('data/latticeFig.png')
-    print("Напишите одно число, которое соответствует Вашим симптомам\nQ - exit\n")
-    print("На что жалуетесь?")
     while True:
         info = fca.getInfo()
-        v = fca.getAttributes()
-        if info:
-            print("\nПоздравляем! У тебя " + ", ".join(info) + "! Можешь прогуливать универ! Вот тебе справка!\n")
-            if v:
-                print("Так-так, погоди. Задам тебе ещё пару вопросов.\n")
-        if not v:
-            print("Больше мы тебе ничего не скажем!\n\nИли ты симулируешь? Признавайся, что на самом деле беспокоит?!\n")
-            continue
-        for i in range(0, len(v)):
-            print(str(i + 1) + " " + ", ".join(v[i]))
-        print(str(len(v) + 1) + " Ни на что! Просто дайте мне справку в универ!")
+        info = sorted(fca.getInfo(),
+                      key=lambda el: (-el[1][0] * el[1][1], -el[1][1], -el[1][0], el[1][3], -el[1][2], -el[1][4]))
+        for i in range(0, len(info)):
+            item = info[i]
+            if item[1][1] > 0.5 and item[1][0] > 0.5:
+                print(item[0] + " - match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
+                    item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
+        print("activeAttributes: " + "[" + (", ".join(list(fca.activeAttributes))) + "]")
+        print("falseAttributes: " + "[" + (", ".join(list(fca.falseAttributes))) + "]")
+        attribute = fca.getAttribute()
+        print("Волнует ли: " + attribute)
         qIn = input()
-        if qIn == "Q":
+        if qIn == "Q" or qIn == "q":
             print("Не болей!")
             exit(0)
+        elif qIn == "R" or qIn == "r":
+            fca.refresh()
+        elif qIn == "N" or qIn == "n":
+            fca.removeAttribute(attribute)
         else:
-            if int(qIn) == len(v) + 1:
-                fca.refresh()
-                print("Или говори, чем болеешь, или справку не дам!\n")
-                continue
-            fca.addAttributes(v[int(qIn) - 1])
+            fca.addAttribute(attribute)
