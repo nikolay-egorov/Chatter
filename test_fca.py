@@ -1,6 +1,7 @@
 from FCA import FCA
 import csv
 import numpy as np
+#-*- coding: utf-8 -*-
 
 # obj = ['a','b','c','d','e','f','g']
 # print(len(obj))
@@ -15,8 +16,10 @@ import numpy as np
 #     ['1','0','0','1','1', '1']
 # ]
 
+print("Укажите путь к файлу матрицы контекста:")
 
-with open('test.csv', 'r') as fp:
+# with open('test.csv', 'r') as fp:
+with open(input(), 'r') as fp:
     reader = csv.reader(fp, delimiter=',', quotechar='"', lineterminator='\n')
     data = np.array([row for row in reader])
     attr = data[0, 2:]
