@@ -45,11 +45,11 @@ with open('test.csv', 'r') as fp:
                       key=lambda el: (-el[1][0] * el[1][1], -el[1][1], -el[1][0], el[1][3], -el[1][2], -el[1][4]))
         for i in range(0, len(info)):
             item = info[i]
-            if item[1][1] > 0.5 and item[1][0] > 0.5:
-                print(item[0] + " - match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
-                    item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
+            print(item[0] + " - match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
+                item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
         print("activeAttributes: " + "[" + (", ".join(list(fca.activeAttributes))) + "]")
         print("falseAttributes: " + "[" + (", ".join(list(fca.falseAttributes))) + "]")
+        print("activeNodes: \n" + "[" + (",\n ".join(map(str, list(fca.activeNodes)))) + "]")
         attribute = fca.getAttribute()
         print("Волнует ли: " + attribute)
         qIn = input()
