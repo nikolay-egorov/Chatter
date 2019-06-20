@@ -33,8 +33,8 @@ class Node:
         return "(#" + str(self.num) + " parents:[" + ", ".join(
             str(parent.num) for parent in self.parents) + "]" + " children:[" + ", ".join(
             str(child.num) for child in self.children) + "]" + (
-            ("\n       A:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + (
-            ("\n       C:" + str(self.objects)) if self.isConcept else "")+ ")"
+                   ("\n       A:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + (
+                   ("\n       C:" + str(self.objects)) if self.isConcept else "") + ")"
 
     def deactivate(self):
         self.active = False
@@ -86,7 +86,8 @@ class FCA:
         self.boolData = np.ones((len(data), len(data[0])))
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
-                if (self.data[i][j] == 0 or self.data[i][j] < sum(self.data[i, :]) / len(attributes) and self.data[i][j] < sum(self.data[:, j]) / len(objects)):
+                if (self.data[i][j] == 0 or self.data[i][j] < sum(self.data[i, :]) / len(attributes) and self.data[i][
+                    j] < sum(self.data[:, j]) / len(objects)):
                     self.boolData[i][j] = False
                 else:
                     self.boolData[i][j] = True
@@ -100,13 +101,22 @@ class FCA:
         self.exams = exams
         self.examsCost = np.asfarray(np.array(examsCost), float)
         self.examsTime = np.asfarray(np.array(examsTime), float)
+
+        for i in range(0, len(examsData)):
+            for j in range(0, len(examsData[i])):
+                if (examsData[i][j] == ""):
+                    examsData[i][j] = "0"
         self.examsData = np.asfarray(np.array(examsData), float)
 
-        self.examsDict = None
+        self.examsDict = dict()
         for i in range(0, len(self.exams)):
             for j in range(0, len(self.attributes)):
                 if self.examsData[i][j] > 0:
+                    if self.exams[i] not in self.examsDict:
+                        self.examsDict[self.exams[i]] = dict()
                     self.examsDict[self.exams[i]][self.attributes[j]] = self.examsData[i][j]
+
+        self.passedExams = []
 
         self.startNode = Node(objects, None, 0)
         self.endNode = Node(None, attributes, 1)
@@ -189,9 +199,7 @@ class FCA:
                             else:
                                 attributesProbability[attribute] = attributeProbability
 
-
-
-        for examName, examAttributes in self.examsDict:
+        for examName, examAttributes in self.examsDict.items():
             for attribute in attributesProbability.keys():
                 attributeProbability = 0
                 attributeImportance = 0
@@ -223,15 +231,24 @@ class FCA:
                             break
             for attribute in examAttributes:
                 if attribute in attributesImportance:
+                    if examName not in examsImportance:
+                        examsImportance[examName] = 0
                     examsImportance[examName] += attributesImportance[attribute]
+
+                    if examName not in examsProbability:
+                        examsProbability[examName] = 0
                     examsProbability[examName] += attributesProbability[attribute]
 
+        for examName in self.passedExams:
+            examsImportance.pop(examName, None)
+            examsProbability.pop(examName, None)
+            examsValue.pop(examName, None)
         examsImportanceList = sorted(examsImportance.items(), key=lambda item: (-item[1], item[0]))
         examsProbabilityList = sorted(examsProbability.items(), key=lambda item: (-item[1], item[0]))
         examsValueList = sorted(examsValue.items(), key=lambda item: (item[1], item[0]))
-        print("examsProbability ", str(examsProbabilityList))
-        print("examsImportance ", str(examsImportanceList))
-        print("examsValue ", str(examsValueList))
+        # print("examsProbability ", str(examsProbabilityList))
+        # print("examsImportance ", str(examsImportanceList))
+        # print("examsValue ", str(examsValueList))
 
         return examsImportanceList, examsProbabilityList, examsValueList
 
@@ -255,22 +272,27 @@ class FCA:
                                     objectNum = list(self.objects).index(object)
                                     attributeNum = list(self.attributes).index(attribute)
                                     # probability of concept = match * frequency of illness
-                                    attributeProbability += self.statistics[object][1] * self.data[objectNum][attributeNum] * self.objectsChance[objectNum]
+                                    attributeProbability += self.statistics[object][1] * self.data[objectNum][
+                                        attributeNum] * self.objectsChance[objectNum]
                                     # importance of concept = completeness * match * frequency of illness
-                                    attributeImportance += self.statistics[object][0] * self.statistics[object][1]  * self.data[objectNum][attributeNum] * self.objectsChance[objectNum]
+                                    attributeImportance += self.statistics[object][0] * self.statistics[object][1] * \
+                                                           self.data[objectNum][attributeNum] * self.objectsChance[
+                                                               objectNum]
                             if attribute in attributesImportance:
-                                attributesImportance[attribute] = max(attributeImportance, attributesImportance[attribute])
+                                attributesImportance[attribute] = max(attributeImportance,
+                                                                      attributesImportance[attribute])
                             else:
                                 attributesImportance[attribute] = attributeImportance
                             if attribute in attributesProbability:
-                                attributesProbability[attribute] = max(attributeProbability, attributesImportance[attribute])
+                                attributesProbability[attribute] = max(attributeProbability,
+                                                                       attributesImportance[attribute])
                             else:
                                 attributesProbability[attribute] = attributeProbability
 
-        items = sorted(attributesProbability.items(), key = lambda item:(-item[1], item[0]))
+        items = sorted(attributesProbability.items(), key=lambda item: (-item[1], item[0]))
 
-        attributesImportanceList = sorted(attributesImportance.items(), key = lambda item:(-item[1], item[0]))
-        attributesProbabilityList = sorted(attributesProbability.items(), key = lambda item:(-item[1], item[0]))
+        attributesImportanceList = sorted(attributesImportance.items(), key=lambda item: (-item[1], item[0]))
+        attributesProbabilityList = sorted(attributesProbability.items(), key=lambda item: (-item[1], item[0]))
         print("attributeProbability ", str(attributesProbabilityList))
         print("attributeImportance ", str(attributesImportanceList))
 
@@ -507,4 +529,3 @@ class FCA:
         self.calculateStatistics()
 
         print("Мы вас слушаем!\n")
-
