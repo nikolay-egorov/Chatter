@@ -77,16 +77,16 @@ class Node:
 
 
 class FCA:
-    def __init__(self, data, objects, attributes, objectsChance):
+    def __init__(self, attributes, objects, objectsChance, data, exams, examsCost, examsTime, examsData):
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
                 if (data[i][j] == ""):
                     data[i][j] = "0"
-        self.data = np.asfarray(np.array(data), float)
+        self.data = data.astype(np.float)
         self.boolData = np.ones((len(data), len(data[0])))
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
-                if (data[i][j] == "0"):
+                if (self.data[i][j] == 0 or self.data[i][j] < sum(self.data[i, :]) / len(attributes) and self.data[i][j] < sum(self.data[:, j]) / len(objects)):
                     self.boolData[i][j] = False
                 else:
                     self.boolData[i][j] = True
@@ -96,11 +96,24 @@ class FCA:
         for chance in self.objectsChance:
             chance /= sum(self.objectsChance)
         self.attributes = attributes
+
+        self.exams = exams
+        self.examsCost = np.asfarray(np.array(examsCost), float)
+        self.examsTime = np.asfarray(np.array(examsTime), float)
+        self.examsData = np.asfarray(np.array(examsData), float)
+
+        self.examsDict = None
+        for i in range(0, len(self.exams)):
+            for j in range(0, len(self.attributes)):
+                if self.examsData[i][j] > 0:
+                    self.examsDict[self.exams[i]][self.attributes[j]] = self.examsData[i][j]
+
         self.startNode = Node(objects, None, 0)
         self.endNode = Node(None, attributes, 1)
         self.size = 2
         self.graph = [self.startNode, self.endNode]
 
+        self.attributesDegree = dict()
         self.activeAttributes = set()
         self.falseAttributes = set()
         self.activeNodes = [self.startNode]
@@ -114,11 +127,11 @@ class FCA:
             sumRequired = 0
             for j in range(0, len(self.attributes)):
                 if self.attributes[j] in self.activeAttributes and self.data[i][j] > 0:
-                    sumActiveRequired += self.data[i][j]
+                    sumActiveRequired += self.attributesDegree[self.attributes[j]] / self.data[i][j]
                 if self.attributes[j] in self.falseAttributes and self.data[i][j] > 0:
                     sumNotActiveRequired += self.data[i][j]
                 if self.attributes[j] in self.activeAttributes and self.data[i][j] == 0:
-                    sumActiveNotRequired += 1
+                    sumActiveNotRequired += self.attributesDegree[self.attributes[j]]
                 if self.data[i][j] > 0:
                     sumRequired += self.data[i][j]
             completeness = sumActiveRequired / sumRequired
@@ -128,11 +141,99 @@ class FCA:
             self.statistics[self.objects[i]] = (completeness, match, surplus, loss, self.objectsChance[i])
 
     def refresh(self):
+        self.attributesDegree = dict()
         self.activeAttributes = set()
         self.falseAttributes = set()
         self.activeNodes = [self.startNode]
         self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0, 0)), self.objects))
         self.calculateStatistics()
+
+    def getExaminations(self):
+        if len(self.activeNodes) == 0:
+            self.refresh()
+            return None
+
+        examsImportance = dict()
+        examsProbability = dict()
+        examsValue = dict(zip(self.exams, self.examsCost))
+
+        attributesProbability = dict()
+        attributesImportance = dict()
+        for activeNode in self.activeNodes:
+            for node in activeNode.children:
+                if node is not self.endNode:
+                    for attribute in node.attributes:
+                        attributeProbability = 0
+                        attributeImportance = 0
+                        if attribute not in self.falseAttributes and attribute not in self.activeAttributes:
+                            for child in self.graph:
+                                if child.isConcept and child.dfs(node, set()):
+                                    object = child.objects[0]
+                                    objectNum = list(self.objects).index(object)
+                                    attributeNum = list(self.attributes).index(attribute)
+                                    # probability of attribute = sum of (match * frequency of attribute * frequency of illness)
+                                    attributeProbability += self.statistics[object][1] * \
+                                                            self.data[objectNum][attributeNum] * \
+                                                            self.objectsChance[objectNum]
+                                    # importance of concept = (completeness * frequency of attribute)
+                                    attributeImportance += self.statistics[object][0] * \
+                                                           self.data[objectNum][attributeNum]
+                            if attribute in attributesImportance:
+                                attributesImportance[attribute] = max(attributeImportance,
+                                                                      attributesImportance[attribute])
+                            else:
+                                attributesImportance[attribute] = attributeImportance
+                            if attribute in attributesProbability:
+                                attributesProbability[attribute] = max(attributeProbability,
+                                                                       attributesImportance[attribute])
+                            else:
+                                attributesProbability[attribute] = attributeProbability
+
+
+
+        for examName, examAttributes in self.examsDict:
+            for attribute in attributesProbability.keys():
+                attributeProbability = 0
+                attributeImportance = 0
+                if attribute in examAttributes and attribute not in self.activeAttributes and attribute not in self.falseAttributes:
+                    for node in self.graph:
+                        if attribute in node.uniqueAttributes:
+                            for child in self.graph:
+                                if child.isConcept and child.dfs(node, set()):
+                                    object = child.objects[0]
+                                    objectNum = list(self.objects).index(object)
+                                    attributeNum = list(self.attributes).index(attribute)
+                                    # probability of attribute = sum of (match * frequency of attribute * frequency of illness)
+                                    attributeProbability += self.statistics[object][1] * \
+                                                            self.data[objectNum][attributeNum] * \
+                                                            self.objectsChance[objectNum]
+                                    # importance of concept = (completeness * frequency of attribute)
+                                    attributeImportance += self.statistics[object][0] * \
+                                                           self.data[objectNum][attributeNum]
+                            if attribute in attributesImportance:
+                                attributesImportance[attribute] = max(attributeImportance,
+                                                                      attributesImportance[attribute])
+                            else:
+                                attributesImportance[attribute] = attributeImportance
+                            if attribute in attributesProbability:
+                                attributesProbability[attribute] = max(attributeProbability,
+                                                                       attributesImportance[attribute])
+                            else:
+                                attributesProbability[attribute] = attributeProbability
+                            break
+            for attribute in examAttributes:
+                if attribute in attributesImportance:
+                    examsImportance[examName] += attributesImportance[attribute]
+                    examsProbability[examName] += attributesProbability[attribute]
+
+        examsImportanceList = sorted(examsImportance.items(), key=lambda item: (-item[1], item[0]))
+        examsProbabilityList = sorted(examsProbability.items(), key=lambda item: (-item[1], item[0]))
+        examsValueList = sorted(examsValue.items(), key=lambda item: (item[1], item[0]))
+        print("examsProbability ", str(examsProbabilityList))
+        print("examsImportance ", str(examsImportanceList))
+        print("examsValue ", str(examsValueList))
+
+        return examsImportanceList, examsProbabilityList, examsValueList
 
     def getAttribute(self):
         if len(self.activeNodes) == 0:
@@ -182,8 +283,9 @@ class FCA:
                 mostImportanceAttribute = attribute
         return mostImportanceAttribute
 
-    def addAttribute(self, attribute):
+    def addAttribute(self, attribute, degree):
         self.activeAttributes.add(attribute)
+        self.attributesDegree[attribute] = degree
         newActiveNodes = []
         for activeNode in self.activeNodes:
             for child in activeNode.children:
@@ -195,6 +297,7 @@ class FCA:
 
     def removeAttribute(self, attribute):
         self.falseAttributes.add(attribute)
+        self.attributesDegree[attribute] = 0
         newActiveNodes = []
         for activeNode in self.activeNodes:
             for child in activeNode.children:
