@@ -137,7 +137,7 @@ class FCA:
             sumRequired = 0
             for j in range(0, len(self.attributes)):
                 if self.attributes[j] in self.activeAttributes and self.data[i][j] > 0:
-                    sumActiveRequired += self.attributesDegree[self.attributes[j]] / self.data[i][j]
+                    sumActiveRequired += max(self.attributesDegree[self.attributes[j]], self.data[i][j])
                 if self.attributes[j] in self.falseAttributes and self.data[i][j] > 0:
                     sumNotActiveRequired += self.data[i][j]
                 if self.attributes[j] in self.activeAttributes and self.data[i][j] == 0:
@@ -206,6 +206,7 @@ class FCA:
                 if attribute in examAttributes and attribute not in self.activeAttributes and attribute not in self.falseAttributes:
                     for node in self.graph:
                         if attribute in node.uniqueAttributes:
+                            sumConceptProbability = 0
                             for child in self.graph:
                                 if child.isConcept and child.dfs(node, set()):
                                     object = child.objects[0]
@@ -218,16 +219,17 @@ class FCA:
                                     # importance of concept = (completeness * frequency of attribute)
                                     attributeImportance += self.statistics[object][0] * \
                                                            self.data[objectNum][attributeNum]
+                                    sumConceptProbability += self.objectsChance[objectNum]
                             if attribute in attributesImportance:
                                 attributesImportance[attribute] = max(attributeImportance,
                                                                       attributesImportance[attribute])
                             else:
                                 attributesImportance[attribute] = attributeImportance
                             if attribute in attributesProbability:
-                                attributesProbability[attribute] = max(attributeProbability,
-                                                                       attributesImportance[attribute])
+                                attributesProbability[attribute] = max(attributeProbability / sumConceptProbability,
+                                                                       attributesProbability[attribute])
                             else:
-                                attributesProbability[attribute] = attributeProbability
+                                attributesProbability[attribute] = attributeProbability / sumConceptProbability
                             break
             for attribute in examAttributes:
                 if attribute in attributesImportance:

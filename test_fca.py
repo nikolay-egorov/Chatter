@@ -65,7 +65,7 @@ with open("test3.csv", 'r') as fp:
                       key=lambda el: (-el[1][0] * el[1][1], -el[1][1], -el[1][0], el[1][3], -el[1][2], -el[1][4]))
         for i in range(0, len(info)):
             item = info[i]
-            print(item[0] + " - match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
+            print(item[0] + " -\n    match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
                 item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
         print("activeAttributes: " + "[" + (", ".join(list(fca.activeAttributes))) + "]")
         print("falseAttributes: " + "[" + (", ".join(list(fca.falseAttributes))) + "]")
@@ -76,7 +76,7 @@ with open("test3.csv", 'r') as fp:
         print("examsImportanceList: " + str(examsImportanceList) + "\n")
         print("examsProbabilityList: " + str(examsProbabilityList) + "\n")
         print("examsValueList: " + str(examsValueList) + "\n")
-        print("EXAMS NUMERATION: \n" + "\n".join((str(i) + ": " + fca.exams[i]) for i in range(0, len(fca.exams)) if fca.exams[i] not in fca.passedExams ))
+        print("EXAMS NUMERATION: \n" + "\n".join((str(i) + ": " + fca.exams[i] + " (" + str(fca.examsCost[i]) + ")") for i in range(0, len(fca.exams)) if fca.exams[i] not in fca.passedExams ))
         print("\nВведите номер исследования: ")
         print(str(numLine), end = " - ")
         numLine += 1
@@ -122,4 +122,5 @@ with open("test3.csv", 'r') as fp:
                     fca.addAttribute(attribute, resIn)
                 else:
                     fca.removeAttribute(attribute)
+            print()
 
