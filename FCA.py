@@ -86,16 +86,16 @@ class FCA:
         self.boolData = np.ones((len(data), len(data[0])))
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
-                if (self.data[i][j] == 0 or self.data[i][j] < sum(self.data[i, :]) / len(attributes) and self.data[i][
-                    j] < sum(self.data[:, j]) / len(objects)):
+                if (self.data[i][j] == 0):
+                    # or self.data[i][j] < sum(self.data[i, :]) / len(attributes) and self.data[i][j] < sum(self.data[:, j]) / len(objects)):
                     self.boolData[i][j] = False
                 else:
                     self.boolData[i][j] = True
 
         self.objects = objects
         self.objectsChance = np.asfarray(np.array(objectsChance), float)
-        for chance in self.objectsChance:
-            chance /= sum(self.objectsChance)
+        sumObjectChance = sum(self.objectsChance)
+        self.objectsChance = list(map(lambda chance: chance / sumObjectChance, self.objectsChance))
         self.attributes = attributes
 
         self.exams = exams
@@ -212,24 +212,26 @@ class FCA:
                                     object = child.objects[0]
                                     objectNum = list(self.objects).index(object)
                                     attributeNum = list(self.attributes).index(attribute)
-                                    # probability of attribute = sum of (match * frequency of attribute * frequency of illness)
                                     attributeProbability += self.statistics[object][1] * \
                                                             self.data[objectNum][attributeNum] * \
                                                             self.objectsChance[objectNum]
-                                    # importance of concept = (completeness * frequency of attribute)
-                                    attributeImportance += self.statistics[object][0] * \
-                                                           self.data[objectNum][attributeNum]
+                                    attributeImportance += (self.statistics[object][0] + 1 - \
+                                                            self.statistics[object][2]) * \
+                                                           self.data[objectNum][attributeNum] * \
+                                                           self.objectsChance[objectNum]
                                     sumConceptProbability += self.objectsChance[objectNum]
+
                             if attribute in attributesImportance:
                                 attributesImportance[attribute] = max(attributeImportance,
                                                                       attributesImportance[attribute])
                             else:
                                 attributesImportance[attribute] = attributeImportance
+                            attributeProbability = 0 if sumConceptProbability == 0 else attributeProbability / sumConceptProbability
                             if attribute in attributesProbability:
-                                attributesProbability[attribute] = max(attributeProbability / sumConceptProbability,
+                                attributesProbability[attribute] = max(attributeProbability,
                                                                        attributesProbability[attribute])
                             else:
-                                attributesProbability[attribute] = attributeProbability / sumConceptProbability
+                                attributesProbability[attribute] = attributeProbability
                             break
             for attribute in examAttributes:
                 if attribute in attributesImportance:
@@ -403,7 +405,15 @@ class FCA:
             tempObjects = [self.objects[k] for k in range(0, objectsLen) if
                            np.array_equal(self.boolData[k, :], self.boolData[i, :])]
             tempAttributes = [self.attributes[j] for j in range(0, attributesLen) if self.data[i][j] > 0]
+
             node = Node(tempObjects, tempAttributes, self.size, isConcept=True)
+            for k in range(0, objectsLen):
+                for j in range(0, attributesLen):
+                    if k != i and self.boolData[i][j] and self.boolData[k][j]:
+                        break
+            else:
+                node.uniqueAttributes = node.attributes.copy()
+                node.isAttributeEntry = True
             for other in self.graph:
                 if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(
                         other.objects):
