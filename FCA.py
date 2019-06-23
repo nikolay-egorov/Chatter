@@ -77,7 +77,7 @@ class Node:
 
 
 class FCA:
-    def __init__(self, attributes, objects, objectsChance, data, exams, examsCost, examsTime, examsData):
+    def __init__(self, attributes, attributesChance, objects, objectsChance, data, exams, examsCost, examsTime, examsData):
         for i in range(0, len(data)):
             for j in range(0, len(data[i])):
                 if (data[i][j] == ""):
@@ -93,10 +93,17 @@ class FCA:
                     self.boolData[i][j] = True
 
         self.objects = objects
-        self.objectsChance = np.asfarray(np.array(objectsChance), float)
-        sumObjectChance = sum(self.objectsChance)
-        self.objectsChance = list(map(lambda chance: chance / sumObjectChance, self.objectsChance))
+        objectsChance = np.asfarray(np.array(objectsChance), float)
+        sumObjectChance = sum(objectsChance)
+        self.objectsChance = list(map(lambda chance: chance / sumObjectChance, objectsChance))
+
         self.attributes = attributes
+
+        attributesChance = np.asfarray(np.array(attributesChance), float)
+        sumAttributesChance = sum(attributesChance)
+        self.attributesChance = list(map(lambda chance: chance / sumAttributesChance, attributesChance))
+
+
 
         self.exams = exams
         self.examsCost = np.asfarray(np.array(examsCost), float)
@@ -125,35 +132,47 @@ class FCA:
 
         self.attributesDegree = dict()
         self.activeAttributes = set()
-        self.falseAttributes = set()
         self.activeNodes = [self.startNode]
         self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0, 0)), self.objects))
 
     def calculateStatistics(self):
         for i in range(0, len(self.objects)):
-            sumActiveRequired = 0
-            sumActiveNotRequired = 0
-            sumNotActiveRequired = 0
-            sumRequired = 0
+            sumActiveRequiredChance = 0
+            sumActiveRequiredAntiChance = 0
+            sumActiveRequiredMatchChance = 0
+            sumActiveRequiredCompletenessAntiChance = 0
+            sumActiveRequiredLossAntiChance = 0
+            sumActiveNotRequiredSurplus = 0
+            sumRequiredChance = 0
+            sumRequiredAntiChance = 0
             for j in range(0, len(self.attributes)):
-                if self.attributes[j] in self.activeAttributes and self.data[i][j] > 0:
-                    sumActiveRequired += max(self.attributesDegree[self.attributes[j]], self.data[i][j])
-                if self.attributes[j] in self.falseAttributes and self.data[i][j] > 0:
-                    sumNotActiveRequired += self.data[i][j]
-                if self.attributes[j] in self.activeAttributes and self.data[i][j] == 0:
-                    sumActiveNotRequired += self.attributesDegree[self.attributes[j]]
-                if self.data[i][j] > 0:
-                    sumRequired += self.data[i][j]
-            completeness = sumActiveRequired / sumRequired
-            loss = sumNotActiveRequired / sumRequired
-            match = 1 if sumNotActiveRequired == 0 else sumActiveRequired / (sumActiveRequired + sumNotActiveRequired)
-            surplus = sumActiveNotRequired / sumRequired
+                attribute = self.attributes[j]
+                Da = 0
+                if attribute in self.attributesDegree:
+                    Da = self.attributesDegree[attribute]
+                Fac = self.data[i][j]
+                Fa = self.attributesChance[j]
+                if attribute in self.activeAttributes and Fac > 0:
+                    sumActiveRequiredMatchChance += min(Da / Fac, Fac) * Fa
+                    sumActiveRequiredCompletenessAntiChance += min(Da / Fac, Fac) * (1 - Fa)
+                    sumActiveRequiredLossAntiChance += max((Fac - Da) / Fac, 0) * (1 - Fa)
+                    sumActiveRequiredChance += Fac * Fa
+                    sumActiveRequiredAntiChance += Fac * (1 - Fa)
+                if Fac > 0:
+                    sumRequiredChance += Fac * Fa
+                    sumRequiredAntiChance += Fac * (1 - Fa)
+                if attribute in self.activeAttributes:
+                    sumActiveNotRequiredSurplus += (max((Da - Fac) / Fac * (1 - Fa), 0) if Fac > 0 else Da * (1 - Fa))
+
+            match = 1 if sumActiveRequiredChance == 0 else sumActiveRequiredMatchChance / sumActiveRequiredChance
+            completeness = 0 if sumRequiredAntiChance == 0 else sumActiveRequiredCompletenessAntiChance / sumRequiredAntiChance
+            loss = sumActiveRequiredLossAntiChance / sumRequiredAntiChance
+            surplus = float("inf") if sumActiveRequiredMatchChance == 0 else sumActiveNotRequiredSurplus / sumActiveRequiredMatchChance
             self.statistics[self.objects[i]] = (completeness, match, surplus, loss, self.objectsChance[i])
 
     def refresh(self):
         self.attributesDegree = dict()
         self.activeAttributes = set()
-        self.falseAttributes = set()
         self.activeNodes = [self.startNode]
         self.statistics = dict(map(lambda object: (object, (0, 0, 0, 0, 0)), self.objects))
         self.calculateStatistics()
@@ -175,7 +194,7 @@ class FCA:
                     for attribute in node.attributes:
                         attributeProbability = 0
                         attributeImportance = 0
-                        if attribute not in self.falseAttributes and attribute not in self.activeAttributes:
+                        if attribute not in self.activeAttributes:
                             for child in self.graph:
                                 if child.isConcept and child.dfs(node, set()):
                                     object = child.objects[0]
@@ -203,7 +222,7 @@ class FCA:
             for attribute in attributesProbability.keys():
                 attributeProbability = 0
                 attributeImportance = 0
-                if attribute in examAttributes and attribute not in self.activeAttributes and attribute not in self.falseAttributes:
+                if attribute in examAttributes and attribute not in self.activeAttributes:
                     for node in self.graph:
                         if attribute in node.uniqueAttributes:
                             sumConceptProbability = 0
@@ -269,7 +288,7 @@ class FCA:
                     for attribute in node.attributes:
                         attributeImportance = 0
                         attributeProbability = 0
-                        if attribute not in self.falseAttributes and attribute not in self.activeAttributes:
+                        if attribute not in self.activeAttributes:
                             for child in self.graph:
                                 if child.isConcept and child.dfs(node, set()):
                                     object = child.objects[0]
@@ -315,21 +334,14 @@ class FCA:
         newActiveNodes = []
         for activeNode in self.activeNodes:
             for child in activeNode.children:
-                if child is not self.endNode and attribute in child.uniqueAttributes:
-                    if child not in self.activeNodes:
-                        newActiveNodes.append(child)
-        self.activeNodes.extend(newActiveNodes)
-        self.calculateStatistics()
-
-    def removeAttribute(self, attribute):
-        self.falseAttributes.add(attribute)
-        self.attributesDegree[attribute] = 0
-        newActiveNodes = []
-        for activeNode in self.activeNodes:
-            for child in activeNode.children:
-                if child is not self.endNode and attribute in child.uniqueAttributes:
-                    if len(set(child.uniqueAttributes) - self.activeAttributes - self.falseAttributes) == 0:
-                        newActiveNodes.append(child)
+                if degree > 0:
+                    if child is not self.endNode and attribute in child.uniqueAttributes:
+                        if child not in self.activeNodes:
+                            newActiveNodes.append(child)
+                else:
+                    if child is not self.endNode and attribute in child.uniqueAttributes:
+                        if len(set(child.uniqueAttributes) - self.activeAttributes) == 0:
+                            newActiveNodes.append(child)
         self.activeNodes.extend(newActiveNodes)
         self.calculateStatistics()
 
@@ -411,9 +423,13 @@ class FCA:
                 for j in range(0, attributesLen):
                     if k != i and self.boolData[i][j] and self.boolData[k][j]:
                         break
+                else:
+                    continue
+                break
             else:
                 node.uniqueAttributes = node.attributes.copy()
                 node.isAttributeEntry = True
+
             for other in self.graph:
                 if sorted(node.attributes) == sorted(other.attributes) and sorted(node.objects) == sorted(
                         other.objects):

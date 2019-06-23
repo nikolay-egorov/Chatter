@@ -29,6 +29,7 @@ with open("test3.csv", 'r') as fp:
             if flag:
                 break
             else:
+                preData.append(row)
                 flag = True
                 continue
         else:
@@ -42,16 +43,17 @@ with open("test3.csv", 'r') as fp:
     exams = np.array(preExams)
 
     attributes = data[0, 3:]
-    objects = data[1:, 0]
-    objectsChance = data[1:, 1]
-    data = data[1:, 3:]
+    objects = data[1:-1, 0]
+    objectsChance = data[1:-1, 1]
+    attributesChance = data[-1, 3:]
+    data = data[1:-1, 3:]
     examsCost = exams[1:, 1]
     examsTime = exams[1:, 2]
     examsData = exams[1:, 3:]
     exams = exams[1:, 0]
 
 
-    fca = FCA(attributes, objects, objectsChance, data, exams, examsCost, examsTime, examsData)
+    fca = FCA(attributes, attributesChance, objects, objectsChance, data, exams, examsCost, examsTime, examsData)
     fca.buildLattice()
     file = open("test.txt", "r+")
     flag = True
@@ -67,8 +69,7 @@ with open("test3.csv", 'r') as fp:
             item = info[i]
             print(item[0] + " -\n    match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
                 item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
-        print("activeAttributes: " + "[" + (", ".join(list(fca.activeAttributes))) + "]")
-        print("falseAttributes: " + "[" + (", ".join(list(fca.falseAttributes))) + "]")
+        print("activeAttributes: " + "[" + (", ".join(map(str, fca.attributesDegree.items())) + "]"))
         # print("activeNodes: \n" + "[" + (",\n ".join(map(str, list(fca.activeNodes)))) + "]")
 
         print()
@@ -117,10 +118,8 @@ with open("test3.csv", 'r') as fp:
                 if not flag:
                     resIn = input()
                     file.write(resIn + "\n")
-                resIn = int(resIn)
-                if resIn > 0:
-                    fca.addAttribute(attribute, resIn)
-                else:
-                    fca.removeAttribute(attribute)
+                resIn = float(resIn)
+                fca.addAttribute(attribute, resIn)
             print()
+            fca.calculateStatistics()
 
