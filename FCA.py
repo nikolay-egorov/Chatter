@@ -31,11 +31,16 @@ class Node:
         self.importance = 0
 
     def __str__(self):
-        return "(#" + str(self.num) + " parents:[" + ", ".join(
-            str(parent.num) for parent in self.parents) + "]" + " children:[" + ", ".join(
-            str(child.num) for child in self.children) + "]" + (
-                   ("\n       A:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + (
-                   ("\n       C:" + str(self.objects)) if self.isConcept else "") + ")"
+        return "(" + \
+               "#" + str(self.num) + \
+               " parents:[" + ", ".join(str(parent.num) for parent in self.parents) + "]" + \
+               " children:[" + ", ".join(str(child.num) for child in self.children) + "]" + \
+               (("\n       A:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + \
+               (("\n       C:" + str(self.objects)) if self.isConcept else "") + \
+               "\n" + str(self.num) + \
+               (("\nATTRIBUTES:\n" + "\n".join(self.uniqueAttributes)) if self.isAttributeEntry else "")+ \
+               (("\nOBJECTS:\n" + "\n".join(self.objects)) if self.isConcept else "") +\
+               ")"
 
     def deactivate(self):
         self.active = False
@@ -154,21 +159,21 @@ class FCA:
                 Fac = self.data[i][j]
                 Fa = self.attributesChance[j]
                 if attribute in self.activeAttributes and Fac > 0:
-                    sumActiveRequiredMatchChance += min(Da / Fac, Fac) * Fa
-                    sumActiveRequiredCompletenessAntiChance += min(Da / Fac, Fac) * (1 - Fa)
-                    sumActiveRequiredLossAntiChance += max((Fac - Da) / Fac, 0) * (1 - Fa)
+                    sumActiveRequiredMatchChance += min(Da, Fac) * Fa
+                    sumActiveRequiredCompletenessAntiChance += min(Da, Fac) * (1 - Fa)
+                    sumActiveRequiredLossAntiChance += max(Fac - Da, 0) * (1 - Fa)
                     sumActiveRequiredChance += Fac * Fa
                     sumActiveRequiredAntiChance += Fac * (1 - Fa)
                 if Fac > 0:
                     sumRequiredChance += Fac * Fa
                     sumRequiredAntiChance += Fac * (1 - Fa)
                 if attribute in self.activeAttributes:
-                    sumActiveNotRequiredSurplus += (max((Da - Fac) / Fac * (1 - Fa), 0) if Fac > 0 else Da * (1 - Fa))
+                    sumActiveNotRequiredSurplus += (max((Da - Fac), 0) if Fac > 0 else Da) * (1 - Fa)
 
             match = 1 if sumActiveRequiredChance == 0 else sumActiveRequiredMatchChance / sumActiveRequiredChance
             completeness = 0 if sumRequiredAntiChance == 0 else sumActiveRequiredCompletenessAntiChance / sumRequiredAntiChance
             loss = sumActiveRequiredLossAntiChance / sumRequiredAntiChance
-            surplus = float("inf") if sumActiveRequiredMatchChance == 0 else sumActiveNotRequiredSurplus / sumActiveRequiredMatchChance
+            surplus = float("inf") if sumRequiredAntiChance == 0 else sumActiveNotRequiredSurplus / sumRequiredAntiChance
             self.statistics[self.objects[i]] = (match, completeness, loss, surplus, self.objectsChance[i])
 
     def refresh(self):
