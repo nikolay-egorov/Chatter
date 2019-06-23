@@ -1,5 +1,6 @@
 import numpy as np
 import networkx as nx
+from IPython.core.hooks import deprecated
 from matplotlib import pyplot as plt
 
 
@@ -168,7 +169,7 @@ class FCA:
             completeness = 0 if sumRequiredAntiChance == 0 else sumActiveRequiredCompletenessAntiChance / sumRequiredAntiChance
             loss = sumActiveRequiredLossAntiChance / sumRequiredAntiChance
             surplus = float("inf") if sumActiveRequiredMatchChance == 0 else sumActiveNotRequiredSurplus / sumActiveRequiredMatchChance
-            self.statistics[self.objects[i]] = (completeness, match, surplus, loss, self.objectsChance[i])
+            self.statistics[self.objects[i]] = (match, completeness, loss, surplus, self.objectsChance[i])
 
     def refresh(self):
         self.attributesDegree = dict()
@@ -192,60 +193,73 @@ class FCA:
             for node in activeNode.children:
                 if node is not self.endNode:
                     for attribute in node.attributes:
-                        attributeProbability = 0
+                        attributeNum = list(self.attributes).index(attribute)
+                        sumAttributeProbability = 0
+                        sumConceptsProbability = 0
                         attributeImportance = 0
                         if attribute not in self.activeAttributes:
-                            for child in self.graph:
-                                if child.isConcept and child.dfs(node, set()):
-                                    object = child.objects[0]
-                                    objectNum = list(self.objects).index(object)
-                                    attributeNum = list(self.attributes).index(attribute)
-                                    # probability of attribute = sum of (match * frequency of attribute * frequency of illness)
-                                    attributeProbability += self.statistics[object][1] * \
-                                                            self.data[objectNum][attributeNum] * \
-                                                            self.objectsChance[objectNum]
-                                    # importance of concept = (completeness * frequency of attribute)
-                                    attributeImportance += self.statistics[object][0] * \
-                                                           self.data[objectNum][attributeNum]
-                            if attribute in attributesImportance:
-                                attributesImportance[attribute] = max(attributeImportance,
-                                                                      attributesImportance[attribute])
-                            else:
-                                attributesImportance[attribute] = attributeImportance
-                            if attribute in attributesProbability:
-                                attributesProbability[attribute] = max(attributeProbability,
-                                                                       attributesImportance[attribute])
-                            else:
-                                attributesProbability[attribute] = attributeProbability
+                            for node in self.graph:
+                                if attribute in node.uniqueAttributes:
+                                    for child in self.graph:
+                                        if child.isConcept and child.dfs(node, set()):
+                                            object = child.objects[0]
+                                            objectNum = list(self.objects).index(object)
+                                            match, completeness, loss, surplus = self.statistics[object][0:4]
+                                            Fac = self.data[objectNum][attributeNum]
+                                            Fa = self.attributesChance[attributeNum]
+                                            Fc = self.objectsChance[objectNum]
+                                            attributeNum = list(self.attributes).index(attribute)
+                                            sumAttributeProbability += match * Fac * Fc
+                                            attributeImportance += (completeness + loss) / \
+                                                                   (surplus if surplus > 0 and surplus != float("+inf") else 1) * \
+                                                                   Fac * (1 - Fa) * Fc
+                                            sumConceptsProbability += Fc
+
+                                    if attribute in attributesImportance:
+                                        attributesImportance[attribute] = max(attributeImportance,
+                                                                              attributesImportance[attribute])
+                                    else:
+                                        attributesImportance[attribute] = attributeImportance
+
+                                    attributeProbability = 0 if sumConceptsProbability == 0 else sumAttributeProbability / sumConceptsProbability
+                                    if attribute in attributesProbability:
+                                        attributesProbability[attribute] = max(attributeProbability,
+                                                                               attributesProbability[attribute])
+                                    else:
+                                        attributesProbability[attribute] = attributeProbability
+                                    break
 
         for examName, examAttributes in self.examsDict.items():
             for attribute in attributesProbability.keys():
-                attributeProbability = 0
+                attributeNum = list(self.attributes).index(attribute)
+                sumAttributeProbability = 0
+                sumConceptsProbability = 0
                 attributeImportance = 0
                 if attribute in examAttributes and attribute not in self.activeAttributes:
                     for node in self.graph:
                         if attribute in node.uniqueAttributes:
-                            sumConceptProbability = 0
                             for child in self.graph:
                                 if child.isConcept and child.dfs(node, set()):
                                     object = child.objects[0]
                                     objectNum = list(self.objects).index(object)
+                                    match, completeness, loss, surplus = self.statistics[object][0:4]
+                                    Fac = self.data[objectNum][attributeNum]
+                                    Fa = self.attributesChance[attributeNum]
+                                    Fc = self.objectsChance[objectNum]
                                     attributeNum = list(self.attributes).index(attribute)
-                                    attributeProbability += self.statistics[object][1] * \
-                                                            self.data[objectNum][attributeNum] * \
-                                                            self.objectsChance[objectNum]
-                                    attributeImportance += (self.statistics[object][0] + 1 - \
-                                                            self.statistics[object][2]) * \
-                                                           self.data[objectNum][attributeNum] * \
-                                                           self.objectsChance[objectNum]
-                                    sumConceptProbability += self.objectsChance[objectNum]
+                                    sumAttributeProbability += match * Fac * Fc
+                                    attributeImportance += (completeness + loss) / \
+                                                           (surplus if surplus > 0 and surplus != float("+inf") else 1) * \
+                                                           Fac * (1 - Fa) * Fc
+                                    sumConceptsProbability += Fc
 
                             if attribute in attributesImportance:
                                 attributesImportance[attribute] = max(attributeImportance,
                                                                       attributesImportance[attribute])
                             else:
                                 attributesImportance[attribute] = attributeImportance
-                            attributeProbability = 0 if sumConceptProbability == 0 else attributeProbability / sumConceptProbability
+
+                            attributeProbability = 0 if sumConceptsProbability == 0 else sumAttributeProbability / sumConceptsProbability
                             if attribute in attributesProbability:
                                 attributesProbability[attribute] = max(attributeProbability,
                                                                        attributesProbability[attribute])
@@ -274,6 +288,7 @@ class FCA:
         # print("examsValue ", str(examsValueList))
 
         return examsImportanceList, examsProbabilityList, examsValueList
+
 
     def getAttribute(self):
         if len(self.activeNodes) == 0:

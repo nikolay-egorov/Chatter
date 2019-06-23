@@ -67,8 +67,8 @@ with open("test3.csv", 'r') as fp:
                       key=lambda el: (-el[1][0] * el[1][1], -el[1][1], -el[1][0], el[1][3], -el[1][2], -el[1][4]))
         for i in range(0, len(info)):
             item = info[i]
-            print(item[0] + " -\n    match: " + '{0:.4f}'.format(item[1][1]) + "; completeness: " + '{0:.4f}'.format(
-                item[1][0]) + "; loss: " + '{0:.4f}'.format(item[1][3]) + "; surplus: " + '{0:.4f}'.format(item[1][2]))
+            print(item[0] + " -\n    match: " + '{0:.4f}'.format(item[1][0]) + "; completeness: " + '{0:.4f}'.format(
+                item[1][1]) + "; loss: " + '{0:.4f}'.format(item[1][2]) + "; surplus: " + '{0:.4f}'.format(item[1][3]))
         print("activeAttributes: " + "[" + (", ".join(map(str, fca.attributesDegree.items())) + "]"))
         # print("activeNodes: \n" + "[" + (",\n ".join(map(str, list(fca.activeNodes)))) + "]")
 
