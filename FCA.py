@@ -31,16 +31,18 @@ class Node:
         self.importance = 0
 
     def __str__(self):
-        return "(" + \
-               "#" + str(self.num) + \
-               " parents:[" + ", ".join(str(parent.num) for parent in self.parents) + "]" + \
-               " children:[" + ", ".join(str(child.num) for child in self.children) + "]" + \
-               (("\n       A:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + \
-               (("\n       C:" + str(self.objects)) if self.isConcept else "") + \
-               "\n" + str(self.num) + \
-               (("\nATTRIBUTES:\n" + "\n".join(self.uniqueAttributes)) if self.isAttributeEntry else "")+ \
-               (("\nOBJECTS:\n" + "\n".join(self.objects)) if self.isConcept else "") +\
-               ")"
+        return "(\n" + \
+           "#" + str(self.num) + \
+           " parents:[" + ", ".join(str(parent.num) for parent in self.parents) + "]" + \
+           " children:[" + ", ".join(str(child.num) for child in self.children) + "]" + \
+           (("\n       UniqueAttributes:" + str(self.uniqueAttributes)) if self.isAttributeEntry else "") + \
+           (("\n       UniqueObjects:" + str(self.objects)) if self.isConcept else "") + \
+           "\n" + str(self.num) + \
+           (("\nOBJECTS:\n" + "\n".join(list(map(lambda s: str((s.split())[0]), self.objects))) + "\n") if self.isConcept else "") + \
+           (("\nATTRIBUTES:\n" + "\n".join(list(map(lambda s: str((s.split())[0]), self.uniqueAttributes))) + "\n") if self.isAttributeEntry else "") + \
+           ")\n"
+    # (("\n       AllAttributes:" + str(self.attributes))) + \
+    # (("\n       AllObjects:" + str(self.objects))) +
 
     def deactivate(self):
         self.active = False
@@ -145,7 +147,7 @@ class FCA:
         for i in range(0, len(self.objects)):
             sumActiveRequiredChance = 0
             sumActiveRequiredAntiChance = 0
-            sumActiveRequiredMatchChance = 0
+            sumActiveRequiredMatchAntiChance = 0
             sumActiveRequiredCompletenessAntiChance = 0
             sumActiveRequiredLossAntiChance = 0
             sumActiveNotRequiredSurplus = 0
@@ -159,7 +161,7 @@ class FCA:
                 Fac = self.data[i][j]
                 Fa = self.attributesChance[j]
                 if attribute in self.activeAttributes and Fac > 0:
-                    sumActiveRequiredMatchChance += min(Da, Fac) * Fa
+                    sumActiveRequiredMatchAntiChance += min(Da, Fac) * (1 - Fa)
                     sumActiveRequiredCompletenessAntiChance += min(Da, Fac) * (1 - Fa)
                     sumActiveRequiredLossAntiChance += max(Fac - Da, 0) * (1 - Fa)
                     sumActiveRequiredChance += Fac * Fa
@@ -170,7 +172,7 @@ class FCA:
                 if attribute in self.activeAttributes:
                     sumActiveNotRequiredSurplus += (max((Da - Fac), 0) if Fac > 0 else Da) * (1 - Fa)
 
-            match = 1 if sumActiveRequiredChance == 0 else sumActiveRequiredMatchChance / sumActiveRequiredChance
+            match = 1 if sumActiveRequiredChance == 0 else sumActiveRequiredMatchAntiChance / sumActiveRequiredAntiChance
             completeness = 0 if sumRequiredAntiChance == 0 else sumActiveRequiredCompletenessAntiChance / sumRequiredAntiChance
             loss = sumActiveRequiredLossAntiChance / sumRequiredAntiChance
             surplus = float("inf") if sumRequiredAntiChance == 0 else sumActiveNotRequiredSurplus / sumRequiredAntiChance

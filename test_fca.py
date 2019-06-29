@@ -38,7 +38,6 @@ with open("test3.csv", 'r') as fp:
             else:
                 preExams.append(row)
 
-
     data = np.array(preData)
     exams = np.array(preExams)
 
@@ -69,13 +68,13 @@ with open("test3.csv", 'r') as fp:
             item = info[i]
             print(item[0] + " -\n    match: " + '{0:.4f}'.format(item[1][0]) + "; completeness: " + '{0:.4f}'.format(
                 item[1][1]) + "; loss: " + '{0:.4f}'.format(item[1][2]) + "; surplus: " + '{0:.4f}'.format(item[1][3]))
-        print("activeAttributes: " + "[" + (", ".join(map(str, fca.attributesDegree.items())) + "]"))
+        print("activeAttributes: " + "[" + ("\n ".join(list(map(lambda item: "({0:} - {1:.2f})".format(item[0], item[1]), fca.attributesDegree.items())))) + "]")
         # print("activeNodes: \n" + "[" + (",\n ".join(map(str, list(fca.activeNodes)))) + "]")
 
         print()
         examsImportanceList, examsProbabilityList, examsValueList = fca.getExaminations()
-        print("examsImportanceList: " + str(examsImportanceList) + "\n")
-        print("examsProbabilityList: " + str(examsProbabilityList) + "\n")
+        print("examsImportanceList: " + "\n ".join(list(map(lambda item: "({0:} - {1:.4f})".format(item[0], item[1]), examsImportanceList))) + "\n")
+        print("examsProbabilityList: " + "\n ".join(list(map(lambda item: "({0:} - {1:.4f})".format(item[0], item[1]), examsProbabilityList))) + "\n")
         print("examsValueList: " + str(examsValueList) + "\n")
         print("EXAMS NUMERATION: \n" + "\n".join((str(i) + ": " + fca.exams[i] + " (" + str(fca.examsCost[i]) + ")") for i in range(0, len(fca.exams)) if fca.exams[i] not in fca.passedExams ))
         print("\nВведите номер исследования: ")
