@@ -45,6 +45,12 @@ class Node:
     # (("\n       AllObjects:" + str(self.objects))) +
 
     def deactivate(self):
+        for parent in self.parents:
+            if self in parent.children:
+                parent.children.remove(self)
+        for child in self.children:
+            if self in child.parents:
+                child.parents.remove(self)
         self.active = False
 
     def isNotEndStart(self):
@@ -122,7 +128,6 @@ class FCA:
                 if (examsData[i][j] == ""):
                     examsData[i][j] = "0"
         self.examsData = np.asfarray(np.array(examsData), float)
-
         self.examsDict = dict()
         for i in range(0, len(self.exams)):
             for j in range(0, len(self.attributes)):
@@ -237,64 +242,84 @@ class FCA:
                                     break
 
         for examName, examAttributes in self.examsDict.items():
-            for attribute in attributesProbability.keys():
-                attributeNum = list(self.attributes).index(attribute)
-                sumAttributeProbability = 0
-                sumConceptsProbability = 0
-                attributeImportance = 0
-                if attribute in examAttributes and attribute not in self.activeAttributes:
-                    for node in self.graph:
-                        if attribute in node.uniqueAttributes:
-                            for child in self.graph:
-                                if child.isConcept and child.dfs(node, set()):
-                                    object = child.objects[0]
-                                    objectNum = list(self.objects).index(object)
-                                    match, completeness, loss, surplus = self.statistics[object][0:4]
-                                    Fac = self.data[objectNum][attributeNum]
-                                    Fa = self.attributesChance[attributeNum]
-                                    Fc = self.objectsChance[objectNum]
-                                    attributeNum = list(self.attributes).index(attribute)
-                                    sumAttributeProbability += match * Fac * Fc
-                                    attributeImportance += (completeness + loss) / \
-                                                           (surplus if surplus > 0 and surplus != float("+inf") else 1) * \
-                                                           Fac * (1 - Fa) * Fc
-                                    sumConceptsProbability += Fc
+            for attribute, value in examAttributes.items():
+                if value == 2 and attribute not in self.activeAttributes:
+                    break
+            else:
+                for attribute in attributesProbability.keys():
+                    attributeNum = list(self.attributes).index(attribute)
+                    sumAttributeProbability = 0
+                    sumConceptsProbability = 0
+                    attributeImportance = 0
+                    if attribute in examAttributes and attribute not in self.activeAttributes:
+                        for node in self.graph:
+                            if attribute in node.uniqueAttributes:
+                                for child in self.graph:
+                                    if child.isConcept and child.dfs(node, set()):
+                                        object = child.objects[0]
+                                        objectNum = list(self.objects).index(object)
+                                        match, completeness, loss, surplus = self.statistics[object][0:4]
+                                        Fac = self.data[objectNum][attributeNum]
+                                        Fa = self.attributesChance[attributeNum]
+                                        Fc = self.objectsChance[objectNum]
+                                        attributeNum = list(self.attributes).index(attribute)
+                                        sumAttributeProbability += match * Fac * Fc
+                                        attributeImportance += (completeness + loss) / \
+                                                               (surplus if surplus > 0 and surplus != float("+inf") else 1) * \
+                                                               Fac * (1 - Fa) * Fc
+                                        sumConceptsProbability += Fc
 
-                            if attribute in attributesImportance:
-                                attributesImportance[attribute] = max(attributeImportance,
-                                                                      attributesImportance[attribute])
-                            else:
-                                attributesImportance[attribute] = attributeImportance
+                                if attribute in attributesImportance:
+                                    attributesImportance[attribute] = max(attributeImportance,
+                                                                          attributesImportance[attribute])
+                                else:
+                                    attributesImportance[attribute] = attributeImportance
 
-                            attributeProbability = 0 if sumConceptsProbability == 0 else sumAttributeProbability / sumConceptsProbability
-                            if attribute in attributesProbability:
-                                attributesProbability[attribute] = max(attributeProbability,
-                                                                       attributesProbability[attribute])
-                            else:
-                                attributesProbability[attribute] = attributeProbability
-                            break
-            for attribute in examAttributes:
-                if attribute in attributesImportance:
-                    if examName not in examsImportance:
-                        examsImportance[examName] = 0
-                    examsImportance[examName] += attributesImportance[attribute]
+                                attributeProbability = 0 if sumConceptsProbability == 0 else sumAttributeProbability / sumConceptsProbability
+                                if attribute in attributesProbability:
+                                    attributesProbability[attribute] = max(attributeProbability,
+                                                                           attributesProbability[attribute])
+                                else:
+                                    attributesProbability[attribute] = attributeProbability
+                                break
+                for attribute in examAttributes:
+                    if attribute in attributesImportance:
+                        if examName not in examsImportance:
+                            examsImportance[examName] = 0
+                        examsImportance[examName] += attributesImportance[attribute]
 
-                    if examName not in examsProbability:
-                        examsProbability[examName] = 0
-                    examsProbability[examName] += attributesProbability[attribute]
-
+                        if examName not in examsProbability:
+                            examsProbability[examName] = 0
+                        examsProbability[examName] += attributesProbability[attribute]
+            if examName in examsProbability:
+                examsProbability[examName] /= self.examsTime[list(self.exams).index(examName)]
         for examName in self.passedExams:
             examsImportance.pop(examName, None)
             examsProbability.pop(examName, None)
             examsValue.pop(examName, None)
         examsImportanceList = sorted(examsImportance.items(), key=lambda item: (-item[1], item[0]))
+        sumExamsImportance = sum([item[1] for item in examsImportanceList])
+        if sumExamsImportance == 0:
+            sumExamsImportance = 1
+        examsImportanceListNormalize = [(item[0], item[1] / sumExamsImportance) for item in examsImportanceList]
+
         examsProbabilityList = sorted(examsProbability.items(), key=lambda item: (-item[1], item[0]))
-        examsValueList = sorted(examsValue.items(), key=lambda item: (item[1], item[0]))
+        sumExamsProbability = sum([item[1] for item in examsProbabilityList])
+        if sumExamsProbability == 0:
+            sumExamsProbability = 1
+        examsProbabilityListNormalize = [(item[0], item[1] / sumExamsProbability) for item in examsProbabilityList]
+
+
+        examsValueList = [(item[0], item[1] / examsValue[item[0]]) for item in examsProbabilityList]
+        sumExamsValue = sum([item[1] for item in examsValueList])
+        if sumExamsValue == 0:
+            sumExamsValue = 1
+        examsValueListNormalize = [(item[0], item[1] / sumExamsValue) for item in examsValueList]
         # print("examsProbability ", str(examsProbabilityList))
         # print("examsImportance ", str(examsImportanceList))
         # print("examsValue ", str(examsValueList))
 
-        return examsImportanceList, examsProbabilityList, examsValueList
+        return examsImportanceListNormalize, examsProbabilityListNormalize, examsValueListNormalize
 
 
     def getAttribute(self):
@@ -351,21 +376,22 @@ class FCA:
         return mostImportanceAttribute
 
     def addAttribute(self, attribute, degree):
-        self.activeAttributes.add(attribute)
-        self.attributesDegree[attribute] = degree
-        newActiveNodes = []
-        for activeNode in self.activeNodes:
-            for child in activeNode.children:
-                if degree > 0:
-                    if child is not self.endNode and attribute in child.uniqueAttributes:
-                        if child not in self.activeNodes:
-                            newActiveNodes.append(child)
-                else:
-                    if child is not self.endNode and attribute in child.uniqueAttributes:
-                        if len(set(child.uniqueAttributes) - self.activeAttributes) == 0:
-                            newActiveNodes.append(child)
-        self.activeNodes.extend(newActiveNodes)
-        self.calculateStatistics()
+        if degree >= 0:
+            self.activeAttributes.add(attribute)
+            self.attributesDegree[attribute] = degree
+            newActiveNodes = []
+            for activeNode in self.activeNodes:
+                for child in activeNode.children:
+                    if degree > 0:
+                        if child is not self.endNode and attribute in child.uniqueAttributes:
+                            if child not in self.activeNodes:
+                                newActiveNodes.append(child)
+                    else:
+                        if child is not self.endNode and attribute in child.uniqueAttributes:
+                            if len(set(child.uniqueAttributes) - self.activeAttributes) == 0:
+                                newActiveNodes.append(child)
+            self.activeNodes.extend(newActiveNodes)
+            self.calculateStatistics()
 
     def getInfo(self):
         return self.statistics.items()
@@ -493,6 +519,8 @@ class FCA:
                 if self.startNode in node.parents and len(node.parents) > 1:
                     node.parents.remove(self.startNode)
                     self.startNode.children.remove(node)
+                if self.startNode in node.parents and len(node.parents) == 1 and self.endNode in node.children and len(node.children) == 1 and len(node.objects) == 0:
+                    node.deactivate()
 
     def getChildrenAttributeIntersection(self, node):
         attributesIntersection = set()

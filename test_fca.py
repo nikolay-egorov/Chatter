@@ -75,10 +75,10 @@ with open("test3.csv", 'r') as fp:
         examsImportanceList, examsProbabilityList, examsValueList = fca.getExaminations()
         print("examsImportanceList: " + "\n ".join(list(map(lambda item: "({0:} - {1:.4f})".format(item[0], item[1]), examsImportanceList))) + "\n")
         print("examsProbabilityList: " + "\n ".join(list(map(lambda item: "({0:} - {1:.4f})".format(item[0], item[1]), examsProbabilityList))) + "\n")
-        print("examsValueList: " + str(examsValueList) + "\n")
-        print("EXAMS NUMERATION: \n" + "\n".join((str(i) + ": " + fca.exams[i] + " (" + str(fca.examsCost[i]) + ")") for i in range(0, len(fca.exams)) if fca.exams[i] not in fca.passedExams ))
+        print("examsValueList: " + "\n ".join(list(map(lambda item: "({0:} - {1:.4f})".format(item[0], item[1]), examsValueList))) + "\n")
+        print("EXAMS NUMERATION: \n" + "\n".join((str(i) + ": " + fca.exams[i] + " (" + str(fca.examsCost[i]) + ")") for i in range(0, len(fca.exams)) if fca.exams[i] in list(map(lambda item: item[0], examsImportanceList))))
         print("\nВведите номер исследования: ")
-        print(str(numLine), end = " - ")
+        print(str(numLine), end = ". ")
         numLine += 1
         qIn = ""
         if flag:
@@ -101,24 +101,26 @@ with open("test3.csv", 'r') as fp:
             fca.refresh()
         else:
             fca.passedExams.append(fca.exams[int(qIn)])
-            for attribute in fca.examsDict[fca.exams[int(qIn)]]:
-                print("Введите результат тестирования симптома " + attribute + ": ")
-                print(str(numLine), end=" - ")
-                numLine += 1
-                resIn = ""
-                if flag:
-                    resIn = file.readline()
-                    if not resIn:
-                        flag = False
-                        file.close()
-                        file = open("test.txt", "a")
-                    else:
-                        print(resIn)
-                if not flag:
-                    resIn = input()
-                    file.write(resIn + "\n")
-                resIn = float(resIn)
-                fca.addAttribute(attribute, resIn)
+            for attribute, value in fca.examsDict[fca.exams[int(qIn)]].items():
+                if value == 1:
+                    print("Введите результат тестирования симптома " + attribute + ": ")
+                    print(str(numLine), end=". ")
+                    numLine += 1
+                    resIn = ""
+                    if flag:
+                        resIn = file.readline()
+                        if not resIn:
+                            flag = False
+                            file.close()
+                            file = open("test.txt", "a")
+                        else:
+                            print(resIn)
+                    if not flag:
+                        resIn = input()
+                        file.write(resIn + "\n")
+                    resIn = float(resIn)
+                    if resIn >= 0:
+                        fca.addAttribute(attribute, resIn)
             print()
             fca.calculateStatistics()
 
